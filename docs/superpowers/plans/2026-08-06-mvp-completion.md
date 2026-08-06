@@ -2275,7 +2275,11 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
 
 Лечится одной строкой: импортом NES.css **в слой**.
 
-Тема живёт в куке и попадает в серверный HTML атрибутом `data-theme`. Это даёт переключатель без мигания при загрузке и без блокирующего inline-скрипта. Медиазапрос `prefers-color-scheme` обслуживает первый визит, атрибут перебивает его в обе стороны — пользователь с системной тёмной темой может выбрать светлую.
+Тема живёт в куке и попадает в серверный HTML атрибутом `data-theme`. Это даёт переключатель без мигания при загрузке и без блокирующего inline-скрипта.
+
+Палитра объявляется **один раз** через `light-dark()`: функция выбирает значение по `color-scheme` элемента, поэтому переключение темы — это смена одного свойства, а не второй экземпляр палитры. `color-scheme: light dark` в `:root` означает «решает система» и обслуживает первый визит без куки; атрибут перебивает его в обе стороны, так что пользователь с системной тёмной темой может выбрать светлую.
+
+Чтение куки живёт в `src/lib/theme.ts` и не копируется по страницам.
 
 Пиксельная сетка отдельных токенов не требует: дефолтная шкала отступов Tailwind (`--spacing: 0.25rem`) — это уже шаг 4px.
 
@@ -2300,54 +2304,38 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
   --font-sans: var(--font-pixel);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Light theme. Dark values override these variables further down. */
-  --color-bg: #ebe9e4;
-  --color-panel: #ffffff;
-  --color-ink: #1a1d21;
-  --color-ink-muted: #5b6169;
-  --color-edge: #1a1d21;
-  --color-streak: #b3341c;
-  --color-freeze: #1c5f8f;
-  --color-miss: #b9bec4;
-  --color-empty: #dfe1e4;
+  /*
+   * Each token is written once. `light-dark()` resolves against the element's
+   * `color-scheme`, so switching themes means flipping that one property
+   * rather than restating the whole palette.
+   */
+  --color-bg: light-dark(#ebe9e4, #14171a);
+  --color-panel: light-dark(#ffffff, #21262b);
+  --color-ink: light-dark(#1a1d21, #f2f4f6);
+  --color-ink-muted: light-dark(#5b6169, #a3acb5);
+  --color-edge: light-dark(#1a1d21, #f2f4f6);
+  --color-streak: light-dark(#b3341c, #ff6b4a);
+  --color-freeze: light-dark(#1c5f8f, #5cb8e8);
+  --color-miss: light-dark(#b9bec4, #3a4148);
+  --color-empty: light-dark(#dfe1e4, #2a3036);
 }
 
 @layer base {
+  /*
+   * Both schemes allowed: with no explicit choice the prefers-color-scheme
+   * media query decides, which is what `light dark` delegates to. The
+   * attribute then pins one, in either direction.
+   */
   :root {
-    color-scheme: light;
+    color-scheme: light dark;
   }
 
-  /*
-   * The dark palette is written twice on purpose: a media query cannot join a
-   * selector list. The media rule covers the first visit, the attribute rule
-   * lets an explicit choice win in either direction. Keep the two in sync.
-   */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --color-bg: #14171a;
-      --color-panel: #21262b;
-      --color-ink: #f2f4f6;
-      --color-ink-muted: #a3acb5;
-      --color-edge: #f2f4f6;
-      --color-streak: #ff6b4a;
-      --color-freeze: #5cb8e8;
-      --color-miss: #3a4148;
-      --color-empty: #2a3036;
-    }
+  :root[data-theme="light"] {
+    color-scheme: light;
   }
 
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --color-bg: #14171a;
-    --color-panel: #21262b;
-    --color-ink: #f2f4f6;
-    --color-ink-muted: #a3acb5;
-    --color-edge: #f2f4f6;
-    --color-streak: #ff6b4a;
-    --color-freeze: #5cb8e8;
-    --color-miss: #3a4148;
-    --color-empty: #2a3036;
   }
 
   body {
@@ -2357,13 +2345,11 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
 
 @layer components {
   /*
-   * The chain. `--chain-n` comes from the component so CHAIN_DAYS stays a
-   * single source of truth; the nth-child count cannot take a variable, so 16
-   * is CHAIN_DAYS - CHAIN_DAYS_COMPACT and must be updated alongside them.
-   *
-   * The trimming applies only to full-length chains, marked with
-   * `data-responsive`. A shorter chain — the ten-day illustration on the
-   * landing page, for instance — would otherwise vanish entirely.
+   * The chain. Both the column count and which cells get trimmed come from
+   * the component, so CHAIN_DAYS and CHAIN_DAYS_COMPACT stay the single
+   * source of truth — no cell count is written here. `nth-child` cannot take
+   * a custom property, which is why the component marks the trimmed cells
+   * with `data-trimmed` instead.
    */
   .chain {
     display: grid;
@@ -2371,7 +2357,7 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
     gap: 2px;
   }
 
-  .chain[data-responsive] > li:nth-child(-n + 16) {
+  .chain > li[data-trimmed] {
     display: none;
   }
 
@@ -2381,7 +2367,7 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
       gap: 4px;
     }
 
-    .chain[data-responsive] > li:nth-child(-n + 16) {
+    .chain > li[data-trimmed] {
       display: block;
     }
   }
@@ -2843,6 +2829,14 @@ document.documentElement.setAttribute('data-theme', 'dark')
 
 Expected: фон страницы и панелей темнеет немедленно, текст остаётся читаемым. Вернуть: `document.documentElement.removeAttribute('data-theme')`.
 
+Отдельно проверить, что `light-dark()` вообще сработал: если фон не меняется ни при каком значении атрибута, значит функция не поддержана либо `color-scheme` не выставлен. Она требует Chrome 123+, Safari 17.5+, Firefox 120+. Проверить в консоли:
+
+```js
+CSS.supports('color', 'light-dark(#fff, #000)')
+```
+
+Expected: `true`.
+
 - [ ] **Step 8: Проверить контраст**
 
 Значения токенов подобраны так, чтобы проходить WCAG AA (4.5:1 для обычного текста). Проверить пипеткой в DevTools или любым калькулятором контраста:
@@ -2944,11 +2938,16 @@ export default function StreakChain({ cells }: { cells: Cell[] }) {
           } as CSSProperties
         }
       >
-        {cells.map((cell) => (
+        {cells.map((cell, index) => (
           <li
             key={cell.date}
             aria-hidden="true"
             data-state={cell.state}
+            data-trimmed={
+              responsive && index < CHAIN_DAYS - CHAIN_DAYS_COMPACT
+                ? ''
+                : undefined
+            }
             data-today={cell.date === lastDate ? '' : undefined}
             className={`aspect-square border-2 border-edge ${STATE_CLASS[cell.state]}`}
           />
