@@ -83,13 +83,7 @@ describe('calculateStreak', () => {
   })
 
   it('a freeze alone can extend a streak', () => {
-    // Check-in on 08-08, freeze on 08-09, today is 08-10.
-    // This covers 08-08, 08-09, 08-10 (today), so current streak is 3... wait.
-    // Actually, today is 08-10. If today is not covered, yesterday must be.
-    // Frozen dates: ['2026-08-09'], checkinDates: ['2026-08-08']
-    // So covered days are 08-08, 08-09. Today (08-10) is not covered.
-    // So the current streak should end at yesterday (08-09), which is covered.
-    // That would make current = 2 (08-08 and 08-09).
+    // A frozen day extends the streak even without a check-in on that day.
     expect(streak(['2026-08-08'], ['2026-08-09'])).toEqual({ current: 2, best: 2 })
   })
 })
