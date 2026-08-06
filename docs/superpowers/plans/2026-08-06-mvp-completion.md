@@ -2244,6 +2244,7 @@ git commit -m "feat: add data access layer for promises, check-ins and freezes"
 - Create: `src/app/nes-theme.css`
 - Rewrite: `src/app/layout.tsx`
 - Create: `src/app/theme-actions.ts`
+- Create: `src/lib/theme.ts`
 - Create: `src/components/ui/panel.tsx`
 - Create: `src/components/ui/pixel-button.tsx`
 - Create: `src/components/ui/field.tsx`
@@ -2255,6 +2256,7 @@ git commit -m "feat: add data access layer for promises, check-ins and freezes"
   - токены `--color-bg`, `--color-panel`, `--color-ink`, `--color-ink-muted`, `--color-edge`, `--color-streak`, `--color-freeze`, `--color-miss`, `--color-empty`
   - утилиты Tailwind `bg-bg`, `bg-panel`, `text-ink`, `text-ink-muted`, `border-edge`, `text-streak`, `bg-streak`, `bg-freeze`, `bg-miss`, `bg-empty`
   - `setTheme(theme: 'light' | 'dark'): Promise<void>` в `src/app/theme-actions.ts`
+  - `type Theme = 'light' | 'dark'` и `readThemeCookie(): Promise<Theme | null>` в `src/lib/theme.ts` — единственное место чтения куки темы, его используют корневой layout и все четыре страницы с шапкой
   - `Panel({ title?, children, className? })` — default export `src/components/ui/panel.tsx`
   - `PixelButton({ variant?, full?, ...buttonProps })` — default export, и `pixelButtonClass(variant?, full?): string` — named export `src/components/ui/pixel-button.tsx`
   - `Field({ id, label, hint?, error?, children })` — default export `src/components/ui/field.tsx`
@@ -2549,7 +2551,29 @@ html,
 }
 ```
 
-- [ ] **Step 3: Написать server action темы**
+- [ ] **Step 3: Написать чтение и запись темы**
+
+Создать `src/lib/theme.ts`:
+
+```ts
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export type Theme = 'light' | 'dark'
+
+/**
+ * The theme the user explicitly chose, or null when they never chose one.
+ *
+ * A null result means no `data-theme` attribute is rendered, which is exactly
+ * what lets the prefers-color-scheme media query decide on a first visit.
+ * Every server component that renders the header reads the cookie through
+ * here — the parsing rule lives in one place.
+ */
+export async function readThemeCookie(): Promise<Theme | null> {
+  const stored = (await cookies()).get('theme')?.value
+  return stored === 'dark' || stored === 'light' ? stored : null
+}
+```
 
 Создать `src/app/theme-actions.ts`:
 
@@ -2581,8 +2605,8 @@ export async function setTheme(theme: 'light' | 'dark'): Promise<void> {
 
 ```tsx
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
 import { Press_Start_2P } from 'next/font/google'
+import { readThemeCookie } from '@/lib/theme'
 import './globals.css'
 
 // The `cyrillic` subset is gone: the interface is English only.
@@ -2603,8 +2627,10 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // Reading the cookie here puts data-theme into the initial HTML, so there is
   // no flash of the wrong theme and no blocking inline script.
-  const stored = (await cookies()).get('theme')?.value
-  const theme = stored === 'dark' || stored === 'light' ? stored : undefined
+  //
+  // A null theme renders no attribute at all, which is what lets the
+  // prefers-color-scheme media query decide on a first visit.
+  const theme = await readThemeCookie()
 
   return (
     <html
@@ -2755,6 +2781,9 @@ export default function Field({
 import { useEffect, useState, useTransition } from 'react'
 import { setTheme } from '@/app/theme-actions'
 
+// Declared locally on purpose. `src/lib/theme.ts` is marked `server-only`, so
+// importing its `Theme` type here would pull a server module into the client
+// bundle and fail the build.
 type Theme = 'light' | 'dark'
 
 export default function ThemeToggle({ stored }: { stored: Theme | null }) {
@@ -2832,7 +2861,7 @@ Expected: каждая пара не ниже 4.5:1. Если ниже — пр�
 - [ ] **Step 9: Коммит**
 
 ```bash
-git add src/app/globals.css src/app/nes-theme.css src/app/layout.tsx src/app/theme-actions.ts src/components/ui/
+git add src/app/globals.css src/app/nes-theme.css src/app/layout.tsx src/app/theme-actions.ts src/lib/theme.ts src/components/ui/
 git commit -m "feat: add design tokens, layered NES.css override and theme switching"
 ```
 
@@ -3429,7 +3458,6 @@ export default function CheckInForm({
 
 ```tsx
 import Link from 'next/link'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import AppHeader from '@/components/layout/app-header'
 import AvatarStage from '@/components/streak/avatar-stage'
@@ -3440,12 +3468,9 @@ import Panel from '@/components/ui/panel'
 import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
+import { readThemeCookie } from '@/lib/theme'
 import { buildChain } from '@/lib/view/chain'
 import CheckInForm from './checkin-form'
-
-function storedTheme(value: string | undefined): 'light' | 'dark' | null {
-  return value === 'light' || value === 'dark' ? value : null
-}
 
 export default async function DashboardPage() {
   await requireSessionUser()
@@ -3459,7 +3484,7 @@ export default async function DashboardPage() {
   const promise = await getOwnPromiseView(profile)
   if (!promise) redirect('/onboarding')
 
-  const theme = storedTheme((await cookies()).get('theme')?.value)
+  const theme = await readThemeCookie()
 
   const cells = buildChain({
     today: promise.today,
@@ -3959,7 +3984,6 @@ export default function ProfileNotFound() {
 
 ```tsx
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import AppHeader from '@/components/layout/app-header'
@@ -3971,6 +3995,7 @@ import Panel from '@/components/ui/panel'
 import { pixelButtonClass } from '@/components/ui/pixel-button'
 import { getPublicProfile } from '@/lib/dal/user'
 import { getPublicPromiseView } from '@/lib/dal/promise'
+import { readThemeCookie } from '@/lib/theme'
 import { buildChain } from '@/lib/view/chain'
 
 interface PageProps {
@@ -3978,10 +4003,6 @@ interface PageProps {
 }
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://never-give.app'
-
-function storedTheme(value: string | undefined): 'light' | 'dark' | null {
-  return value === 'light' || value === 'dark' ? value : null
-}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params
@@ -4016,7 +4037,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
   const promise = await getPublicPromiseView(profile)
   if (!promise) notFound()
 
-  const theme = storedTheme((await cookies()).get('theme')?.value)
+  const theme = await readThemeCookie()
 
   const cells = buildChain({
     today: promise.today,
@@ -4344,13 +4365,13 @@ git commit -m "feat: render OG image with the pixel font via next/og"
 
 ```tsx
 import Link from 'next/link'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import AppHeader from '@/components/layout/app-header'
 import StreakChain from '@/components/streak/streak-chain'
 import Panel from '@/components/ui/panel'
 import { pixelButtonClass } from '@/components/ui/pixel-button'
 import { datesBetween } from '@/lib/dates'
+import { readThemeCookie } from '@/lib/theme'
 import { buildChain } from '@/lib/view/chain'
 import { createClient } from '@/utils/supabase/server'
 
@@ -4394,10 +4415,6 @@ const STEPS = [
   },
 ]
 
-function storedTheme(value: string | undefined): 'light' | 'dark' | null {
-  return value === 'light' || value === 'dark' ? value : null
-}
-
 export default async function Home() {
   const supabase = await createClient()
   const {
@@ -4407,7 +4424,7 @@ export default async function Home() {
   // Outside any try/catch: redirect() throws a control-flow exception.
   if (user) redirect('/dashboard')
 
-  const theme = storedTheme((await cookies()).get('theme')?.value)
+  const theme = await readThemeCookie()
 
   return (
     <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-8 p-4 sm:p-8">
@@ -4597,17 +4614,13 @@ export default function LoginForm() {
 Заменить содержимое `src/app/login/page.tsx`:
 
 ```tsx
-import { cookies } from 'next/headers'
 import AppHeader from '@/components/layout/app-header'
 import Panel from '@/components/ui/panel'
+import { readThemeCookie } from '@/lib/theme'
 import LoginForm from './login-form'
 
-function storedTheme(value: string | undefined): 'light' | 'dark' | null {
-  return value === 'light' || value === 'dark' ? value : null
-}
-
 export default async function LoginPage() {
-  const theme = storedTheme((await cookies()).get('theme')?.value)
+  const theme = await readThemeCookie()
 
   return (
     <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
