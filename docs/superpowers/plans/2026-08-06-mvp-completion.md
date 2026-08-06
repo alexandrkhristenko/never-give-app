@@ -19,9 +19,23 @@
 - **`db:push` запрещён.** Только `db:generate` + `db:migrate`. Политики RLS живут в custom-миграции и невидимы для снапшота drizzle-kit; `push` их снесёт.
 - **RLS-политики:** роль указывается в `TO`, `auth.role()` не используется. `TO authenticated` всегда сопровождается предикатом владения. `UPDATE` требует и `USING`, и `WITH CHECK`. `auth.uid()` оборачивается в `(select auth.uid())`.
 - **`users.id` всегда равен `auth.users.id`.** На этом держатся все политики.
-- **Чистые модули** (`src/lib/dates.ts`, `src/lib/streak.ts`) не импортируют ничего, кроме друг друга, и не читают текущее время. Время передаётся аргументом.
+- **Чистые модули** (`src/lib/dates.ts`, `src/lib/streak.ts`, `src/lib/view/*`) не импортируют ничего, кроме друг друга, и не читают текущее время. Время передаётся аргументом.
 - **DAL-модули** начинаются с `import 'server-only'`.
-- **Константы:** `FREEZE_EARN_INTERVAL = 7`, `MAX_FREEZE_BALANCE = 3`.
+- **Константы:** `FREEZE_EARN_INTERVAL = 7`, `MAX_FREEZE_BALANCE = 3`, `CHAIN_DAYS = 30`, `CHAIN_DAYS_COMPACT = 14`, `PROMISE_MAX_LENGTH = 80`.
+
+### Ограничения фронтенда
+
+Нормативный источник — [docs/superpowers/specs/2026-08-06-frontend-design.md](../specs/2026-08-06-frontend-design.md).
+
+- **Классы `nes-*`** пишутся в `src/app/globals.css`, `src/app/nes-theme.css`, компонентах `src/components/` и на самих полях ввода, которые передаются в `Field` как children (`nes-input`, `nes-select`) — примитива для контрола нет. Контейнеры и кнопки за пределами `src/components/` берутся из `Panel`, `PixelButton` и `pixelButtonClass`: **`nes-container` и `nes-btn` в файлах роутов запрещены.**
+- **Литеральные цвета запрещены.** Ни `#212529`, ни `text-red-500`, ни `text-gray-500`. Только токены из `@theme` (задача 9a).
+- **Брейкпоинты — только `sm` (640) и `lg` (1024).** `md` не используется нигде: именно он оставлял непроверенным диапазон 375–767px.
+- **Дашборд и публичный профиль — одна колонка `max-w-[42rem]` на всех ширинах.** Перестроений «несколько колонок → одна» нет.
+- **`min-w-0`** на каждом grid/flex-потомке с текстом: моноширинный шрифт иначе распирает колонку изнутри.
+- **Горизонтальной прокрутки у `body` нет ни на одной ширине.** Проверяется E2E-тестом в задаче 14.
+- **Спрайт не масштабируется в потоке.** `transform: scale()` не меняет занимаемое место, поэтому соседние блоки о размере не знают. Масштабировать можно только внутри обёртки, чей размер задан явно и уже учитывает масштаб.
+- **Кнопка с `disabled` вместо объяснения запрещена.** Если действие недоступно, рендерится не кнопка, а `<p role="status">` с причиной.
+- **Всякая анимация выключается** под `@media (prefers-reduced-motion: reduce)`.
 - **Язык кода** — английский: идентификаторы, комментарии, сообщения коммитов, строки UI.
 - Нормативная семантика — [docs/product-spec.md](../../product-spec.md). При расхождении кода и спеки правится код.
 
@@ -40,17 +54,36 @@
 | `src/db/rls.ts` | Обёртки `withUser` / `withAnon` | 7 |
 | `src/lib/dal/session.ts` | Сессия и её проверка | 8 |
 | `src/lib/dal/user.ts` | Профиль: свой и публичный | 8 |
-| `src/lib/dal/promise.ts` | Обещание, чек-ины, заморозки | 9 |
+| `src/lib/dal/promise.ts` | Обещание, чек-ины, заморозки | 9, 11 |
+| `src/app/globals.css` | Порядок слоёв, токены, две темы | 9a |
+| `src/app/nes-theme.css` | Единственное место переопределения NES.css | 9a |
+| `src/app/layout.tsx` | Шрифт, `data-theme` из куки | 9a |
+| `src/app/theme-actions.ts` | Server action переключения темы | 9a |
+| `src/components/ui/panel.tsx` | Примитив панели | 9a |
+| `src/components/ui/pixel-button.tsx` | Примитив кнопки | 9a |
+| `src/components/ui/field.tsx` | Примитив поля формы | 9a |
+| `src/components/ui/theme-toggle.tsx` | Переключатель темы (клиент) | 9a |
+| `src/lib/view/chain.ts` | Чистая сборка ячеек цепочки | 9b |
+| `src/lib/view/stage.ts` | Чистое отображение стрика в стадию аватара | 9b |
+| `src/components/streak/*` | Цепочка, статы, заморозки, аватар | 9c |
+| `src/components/layout/*` | Шапка и меню | 9c |
+| `src/components/share/share-bar.tsx` | Панель шаринга (клиент) | 9c |
 | `src/app/dashboard/page.tsx` | Экран дашборда | 10 |
 | `src/app/dashboard/actions.ts` | Server action чек-ина | 10 |
+| `src/app/dashboard/checkin-form.tsx` | Клиентская форма чек-ина | 10 |
 | `src/app/dashboard/error.tsx` | Граница ошибок дашборда | 10 |
 | `src/app/onboarding/page.tsx` | Экран онбординга | 11 |
-| `src/app/onboarding/actions.ts` | Server action онбординга | 11 |
+| `src/app/onboarding/actions.ts` | Server actions онбординга | 11 |
 | `src/app/onboarding/onboarding-form.tsx` | Клиентская форма онбординга | 11 |
 | `src/app/[username]/page.tsx` | Публичный профиль | 12 |
 | `src/app/[username]/not-found.tsx` | 404 профиля | 12 |
 | `src/app/[username]/opengraph-image.tsx` | OG-картинка | 13 |
 | `assets/PressStart2P-Regular.ttf` | Шрифт для OG | 13 |
+| `src/app/page.tsx` | Лендинг | 13a |
+| `src/app/login/page.tsx` | Экран входа | 13a |
+| `src/app/dashboard/loading.tsx` | Скелет дашборда | 13b |
+| `src/app/[username]/loading.tsx` | Скелет профиля | 13b |
+| `src/app/not-found.tsx` | Глобальная 404 | 13b |
 | `playwright.config.ts`, `e2e/*` | E2E-тесты | 14 |
 
 Удаляются: `src/app/api/og/route.tsx` (задача 13).
@@ -700,7 +733,7 @@ git commit -m "feat: add streak freeze planning and earning rules"
 
 ---
 
-### Task 4: Валидация username
+### Task 4: Валидация username и текста обещания
 
 **Files:**
 - Create: `src/lib/validation.ts`
@@ -712,8 +745,13 @@ git commit -m "feat: add streak freeze planning and earning rules"
   - `type UsernameError = 'invalid_format' | 'reserved'`
   - `const RESERVED_USERNAMES: readonly string[]`
   - `validateUsername(username: string): UsernameError | null`
+  - `const PROMISE_MAX_LENGTH = 80`
+  - `type PromiseTitleError = 'empty' | 'too_long'`
+  - `validatePromiseTitle(title: string): PromiseTitleError | null`
 
-**Контекст.** Правила — [docs/product-spec.md §6](../../product-spec.md). Публичный профиль живёт в корне (`/<username>`), поэтому ник конкурирует за путь с системными роутами: `/login`, `/dashboard`, `/onboarding`, `/auth`, `/api`. Занятые имена нужно запрещать.
+**Контекст.** Правила username — [docs/product-spec.md §6](../../product-spec.md). Публичный профиль живёт в корне (`/<username>`), поэтому ник конкурирует за путь с системными роутами: `/login`, `/dashboard`, `/onboarding`, `/auth`, `/api`. Занятые имена нужно запрещать.
+
+Длина обещания ограничивается 80 символами. Это не вкусовое число: текст обещания — заголовок экрана, набранный пиксельным шрифтом, у которого ширина глифа ровно `1em`. На 320px под контент остаётся 248px, и всё, что длиннее, разносит вёрстку ([спека §5.3](../specs/2026-08-06-frontend-design.md)). Ограничение живёт на трёх уровнях: здесь, в схеме БД (задача 5) и в `maxLength` на инпуте (задача 11).
 
 - [ ] **Step 1: Написать падающие тесты**
 
@@ -721,7 +759,37 @@ git commit -m "feat: add streak freeze planning and earning rules"
 
 ```ts
 import { describe, expect, it } from 'vitest'
-import { validateUsername } from './validation'
+import {
+  PROMISE_MAX_LENGTH,
+  validatePromiseTitle,
+  validateUsername,
+} from './validation'
+
+describe('validatePromiseTitle', () => {
+  it('accepts an ordinary promise', () => {
+    expect(validatePromiseTitle('Code every day')).toBeNull()
+  })
+
+  it('rejects blank input, including whitespace only', () => {
+    expect(validatePromiseTitle('')).toBe('empty')
+    expect(validatePromiseTitle('   ')).toBe('empty')
+  })
+
+  it('accepts the boundary length', () => {
+    expect(validatePromiseTitle('a'.repeat(PROMISE_MAX_LENGTH))).toBeNull()
+  })
+
+  it('rejects one character past the boundary', () => {
+    expect(validatePromiseTitle('a'.repeat(PROMISE_MAX_LENGTH + 1))).toBe(
+      'too_long',
+    )
+  })
+
+  it('measures the trimmed value', () => {
+    const padded = `  ${'a'.repeat(PROMISE_MAX_LENGTH)}  `
+    expect(validatePromiseTitle(padded)).toBeNull()
+  })
+})
 
 describe('validateUsername', () => {
   it('accepts letters, digits and underscores', () => {
@@ -804,18 +872,371 @@ export function validateUsername(username: string): UsernameError | null {
   if (RESERVED_USERNAMES.includes(username.toLowerCase())) return 'reserved'
   return null
 }
+
+/**
+ * The promise is the page heading, set in a monospaced pixel font. Anything
+ * longer than this wraps past what a 320px screen can hold.
+ */
+export const PROMISE_MAX_LENGTH = 80
+
+export type PromiseTitleError = 'empty' | 'too_long'
+
+export function validatePromiseTitle(title: string): PromiseTitleError | null {
+  const trimmed = title.trim()
+  if (trimmed.length === 0) return 'empty'
+  if (trimmed.length > PROMISE_MAX_LENGTH) return 'too_long'
+  return null
+}
 ```
 
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
 Run: `npm test`
-Expected: PASS — 43 теста.
+Expected: PASS — 48 тестов.
 
 - [ ] **Step 5: Коммит**
 
 ```bash
 git add src/lib/validation.ts src/lib/validation.test.ts
 git commit -m "feat: add username validation with reserved route names"
+```
+
+---
+
+### Task 4a: Чистый слой представления
+
+**Files:**
+- Create: `src/lib/view/chain.ts`
+- Create: `src/lib/view/chain.test.ts`
+- Create: `src/lib/view/stage.ts`
+- Create: `src/lib/view/stage.test.ts`
+
+**Interfaces:**
+- Consumes: `addDays`, `datesBetween`, `LocalDate` из `src/lib/dates.ts`
+- Produces:
+  - `const CHAIN_DAYS = 30`, `const CHAIN_DAYS_COMPACT = 14`
+  - `type CellState = 'checked' | 'frozen' | 'missed' | 'empty'`
+  - `interface Cell { date: LocalDate; state: CellState }`
+  - `interface ChainInput { today: LocalDate; checkinDates: LocalDate[]; frozenDates: LocalDate[]; startedOn: LocalDate | null; days?: number }`
+  - `chainWindowStart(today: LocalDate, days?: number): LocalDate`
+  - `buildChain(input: ChainInput): Cell[]`
+  - `interface ChainSummary { checked: number; frozen: number; missed: number }`
+  - `summarizeChain(cells: Cell[]): ChainSummary`
+  - `type Stage = 'dormant' | 'walking' | 'running' | 'blazing' | 'crowned'`
+  - `stageOf(currentStreak: number): Stage`
+  - `daysToNextStage(currentStreak: number): number | null`
+
+**Контекст.** Дашборд, публичный профиль и OG-картинка рисуют одну и ту же цепочку дней. Если собирать её на месте, повторится история дублированного `calculateStreak` ([known-issues.md 1.3](../../known-issues.md)) — только в вёрстке, где её никто не покроет тестами.
+
+Модуль чистый по тем же правилам, что `dates.ts` и `streak.ts`: без БД, без чтения системных часов, `today` приходит аргументом.
+
+Ключевое различие состояний — `missed` против `empty`. День без чек-ина считается пропущенным только если он **после** первого чек-ина пользователя. У человека, зарегистрировавшегося вчера, предыдущие 29 дней не «пропущены»: его тогда просто не было. Отсюда обязательный `startedOn` во входных данных.
+
+Окно цепочки заканчивается сегодняшним днём, поэтому состояния `future` не существует.
+
+Пороги стадий аватара — из [спеки §5.4](../specs/2026-08-06-frontend-design.md): 0 / 1 / 7 / 30 / 100.
+
+- [ ] **Step 1: Написать падающие тесты цепочки**
+
+Создать `src/lib/view/chain.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest'
+import {
+  CHAIN_DAYS,
+  buildChain,
+  chainWindowStart,
+  summarizeChain,
+} from './chain'
+
+const TODAY = '2026-08-10'
+
+describe('chainWindowStart', () => {
+  it('spans CHAIN_DAYS days inclusive of today', () => {
+    expect(chainWindowStart(TODAY)).toBe('2026-07-12')
+  })
+
+  it('honours a custom window length', () => {
+    expect(chainWindowStart(TODAY, 14)).toBe('2026-07-28')
+  })
+})
+
+describe('buildChain', () => {
+  it('returns exactly CHAIN_DAYS cells ending on today', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: [],
+      frozenDates: [],
+      startedOn: null,
+    })
+
+    expect(cells).toHaveLength(CHAIN_DAYS)
+    expect(cells[0].date).toBe('2026-07-12')
+    expect(cells[CHAIN_DAYS - 1].date).toBe(TODAY)
+  })
+
+  it('marks days before the first check-in as empty, not missed', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: ['2026-08-09', '2026-08-10'],
+      frozenDates: [],
+      startedOn: '2026-08-09',
+      days: 4,
+    })
+
+    expect(cells.map((cell) => cell.state)).toEqual([
+      'empty',
+      'empty',
+      'checked',
+      'checked',
+    ])
+  })
+
+  it('distinguishes checked, frozen and missed days', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: ['2026-08-07', '2026-08-10'],
+      frozenDates: ['2026-08-08'],
+      startedOn: '2026-08-07',
+      days: 4,
+    })
+
+    expect(cells.map((cell) => cell.state)).toEqual([
+      'checked',
+      'frozen',
+      'missed',
+      'checked',
+    ])
+  })
+
+  it('ignores dates outside the window', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: ['2026-01-01'],
+      frozenDates: [],
+      startedOn: '2026-01-01',
+      days: 3,
+    })
+
+    expect(cells.map((cell) => cell.state)).toEqual([
+      'missed',
+      'missed',
+      'missed',
+    ])
+  })
+
+  it('treats a user with no history as entirely empty', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: [],
+      frozenDates: [],
+      startedOn: null,
+      days: 3,
+    })
+
+    expect(cells.every((cell) => cell.state === 'empty')).toBe(true)
+  })
+})
+
+describe('summarizeChain', () => {
+  it('counts each state', () => {
+    const cells = buildChain({
+      today: TODAY,
+      checkinDates: ['2026-08-07', '2026-08-10'],
+      frozenDates: ['2026-08-08'],
+      startedOn: '2026-08-07',
+      days: 4,
+    })
+
+    expect(summarizeChain(cells)).toEqual({
+      checked: 2,
+      frozen: 1,
+      missed: 1,
+    })
+  })
+})
+```
+
+- [ ] **Step 2: Убедиться, что тесты падают**
+
+Run: `npx vitest run src/lib/view/chain.test.ts`
+Expected: FAIL — `Failed to resolve import "./chain"`.
+
+- [ ] **Step 3: Реализовать `chain.ts`**
+
+Создать `src/lib/view/chain.ts`:
+
+```ts
+import { addDays, datesBetween, type LocalDate } from '../dates'
+
+/** Days the chain shows on `sm` and wider. */
+export const CHAIN_DAYS = 30
+
+/** Days the chain shows below `sm`. The rest are hidden with CSS. */
+export const CHAIN_DAYS_COMPACT = 14
+
+export type CellState = 'checked' | 'frozen' | 'missed' | 'empty'
+
+export interface Cell {
+  date: LocalDate
+  state: CellState
+}
+
+export interface ChainInput {
+  today: LocalDate
+  checkinDates: LocalDate[]
+  frozenDates: LocalDate[]
+  /** The user's first check-in. Days before it are empty, not missed. */
+  startedOn: LocalDate | null
+  days?: number
+}
+
+export interface ChainSummary {
+  checked: number
+  frozen: number
+  missed: number
+}
+
+/** First day the chain shows, inclusive. */
+export function chainWindowStart(
+  today: LocalDate,
+  days: number = CHAIN_DAYS,
+): LocalDate {
+  return addDays(today, -(days - 1))
+}
+
+export function buildChain(input: ChainInput): Cell[] {
+  const days = input.days ?? CHAIN_DAYS
+  const checked = new Set(input.checkinDates)
+  const frozen = new Set(input.frozenDates)
+
+  return datesBetween(chainWindowStart(input.today, days), input.today).map(
+    (date): Cell => {
+      if (checked.has(date)) return { date, state: 'checked' }
+      if (frozen.has(date)) return { date, state: 'frozen' }
+
+      // Before the user's first check-in there was nothing to miss.
+      const started = input.startedOn !== null && date >= input.startedOn
+      return { date, state: started ? 'missed' : 'empty' }
+    },
+  )
+}
+
+export function summarizeChain(cells: Cell[]): ChainSummary {
+  return {
+    checked: cells.filter((cell) => cell.state === 'checked').length,
+    frozen: cells.filter((cell) => cell.state === 'frozen').length,
+    missed: cells.filter((cell) => cell.state === 'missed').length,
+  }
+}
+```
+
+Сравнение `date >= input.startedOn` работает лексикографически, потому что `LocalDate` — это всегда `YYYY-MM-DD` с ведущими нулями.
+
+- [ ] **Step 4: Убедиться, что тесты цепочки проходят**
+
+Run: `npx vitest run src/lib/view/chain.test.ts`
+Expected: PASS — 8 тестов.
+
+- [ ] **Step 5: Написать падающие тесты стадий**
+
+Создать `src/lib/view/stage.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest'
+import { daysToNextStage, stageOf } from './stage'
+
+describe('stageOf', () => {
+  it.each([
+    [0, 'dormant'],
+    [1, 'walking'],
+    [6, 'walking'],
+    [7, 'running'],
+    [29, 'running'],
+    [30, 'blazing'],
+    [99, 'blazing'],
+    [100, 'crowned'],
+    [10_000, 'crowned'],
+  ])('maps a streak of %i to %s', (streak, stage) => {
+    expect(stageOf(streak)).toBe(stage)
+  })
+})
+
+describe('daysToNextStage', () => {
+  it.each([
+    [0, 1],
+    [1, 6],
+    [6, 1],
+    [7, 23],
+    [29, 1],
+    [30, 70],
+    [99, 1],
+  ])('reports %i days short of the next stage from %i', (streak, remaining) => {
+    expect(daysToNextStage(streak)).toBe(remaining)
+  })
+
+  it('returns null at the final stage', () => {
+    expect(daysToNextStage(100)).toBeNull()
+    expect(daysToNextStage(500)).toBeNull()
+  })
+})
+```
+
+- [ ] **Step 6: Убедиться, что тесты падают**
+
+Run: `npx vitest run src/lib/view/stage.test.ts`
+Expected: FAIL — `Failed to resolve import "./stage"`.
+
+- [ ] **Step 7: Реализовать `stage.ts`**
+
+Создать `src/lib/view/stage.ts`:
+
+```ts
+export type Stage = 'dormant' | 'walking' | 'running' | 'blazing' | 'crowned'
+
+interface StageThreshold {
+  stage: Stage
+  min: number
+}
+
+/** Ordered high to low so the first match wins. */
+const THRESHOLDS: StageThreshold[] = [
+  { stage: 'crowned', min: 100 },
+  { stage: 'blazing', min: 30 },
+  { stage: 'running', min: 7 },
+  { stage: 'walking', min: 1 },
+  { stage: 'dormant', min: 0 },
+]
+
+export function stageOf(currentStreak: number): Stage {
+  const match = THRESHOLDS.find(
+    (threshold) => currentStreak >= threshold.min,
+  )
+  return match ? match.stage : 'dormant'
+}
+
+/** Days left until the avatar changes, or null once it cannot change again. */
+export function daysToNextStage(currentStreak: number): number | null {
+  // Thresholds run high to low; the last one above the current streak is the
+  // next one the user will reach.
+  const next = [...THRESHOLDS]
+    .reverse()
+    .find((threshold) => threshold.min > currentStreak)
+
+  return next ? next.min - currentStreak : null
+}
+```
+
+- [ ] **Step 8: Убедиться, что все тесты проходят**
+
+Run: `npm test`
+Expected: PASS — 73 теста.
+
+- [ ] **Step 9: Коммит**
+
+```bash
+git add src/lib/view/
+git commit -m "feat: add pure view helpers for the streak chain and avatar stage"
 ```
 
 ---
@@ -836,6 +1257,7 @@ git commit -m "feat: add username validation with reserved route names"
   - индекс `promises_user_id_idx`
   - CHECK-ограничение `users_freeze_balance_range`
   - уникальный индекс `users_username_lower_idx` на `lower(username)`
+  - `promises.title` сужается до `varchar(80)`
   - npm-скрипт `db:migrate`
 
 **Контекст.** Миграций в репозитории нет вообще: схема применялась через `db:push`. Эта задача создаёт базовую миграцию и добавляет структуры, нужные для заморозок и RLS.
@@ -916,7 +1338,9 @@ export const users = pgTable('users', {
 export const promises = pgTable('promises', {
   id: uuid('id').primaryKey().defaultRandom(),
   user_id: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  title: varchar('title', { length: 255 }).notNull(),
+  // 80 characters is what the pixel font fits on a 320px screen without
+  // wrecking the layout. See the frontend design spec, section 5.3.
+  title: varchar('title', { length: 80 }).notNull(),
   visibility: varchar('visibility', { length: 50 }).notNull().default('public'), // 'public', 'unlisted', 'private'
   cadence: varchar('cadence', { length: 50 }).notNull().default('daily'), // reserved: 'daily', 'weekly'
   cadence_count: integer('cadence_count').notNull().default(1), // reserved
@@ -1484,13 +1908,14 @@ git commit -m "feat: add data access layer for session and profile"
 - Create: `src/lib/dal/promise.ts`
 
 **Interfaces:**
-- Consumes: `withUser`, `withAnon`, `DbTransaction` из `src/db/rls.ts`; `promises`, `checkins`, `streak_freezes`, `users` из `src/db/schema.ts`; `Profile`, `PublicProfile` из `src/lib/dal/user.ts`; `localDateOf`, `LocalDate` из `src/lib/dates.ts`; `calculateStreak`, `planFreezes`, `earnedFreezeBalance` из `src/lib/streak.ts`
+- Consumes: `withUser`, `withAnon`, `DbTransaction` из `src/db/rls.ts`; `promises`, `checkins`, `streak_freezes`, `users` из `src/db/schema.ts`; `Profile`, `PublicProfile` из `src/lib/dal/user.ts`; `localDateOf`, `LocalDate` из `src/lib/dates.ts`; `calculateStreak`, `planFreezes`, `earnedFreezeBalance` из `src/lib/streak.ts`; `chainWindowStart` из `src/lib/view/chain.ts`
 - Produces:
-  - `interface PromiseView { id: string; title: string; visibility: string; today: LocalDate; checkedInToday: boolean; currentStreak: number; bestStreak: number; freezeBalance: number }`
-  - `interface PublicPromiseView { title: string; visibility: string; currentStreak: number; bestStreak: number }`
+  - `interface PromiseView { id: string; title: string; visibility: string; today: LocalDate; checkedInToday: boolean; currentStreak: number; bestStreak: number; freezeBalance: number; startedOn: LocalDate | null; recentCheckins: LocalDate[]; recentFrozen: LocalDate[] }`
+  - `interface PublicPromiseView { title: string; visibility: string; today: LocalDate; currentStreak: number; bestStreak: number; startedOn: LocalDate | null; recentCheckins: LocalDate[]; recentFrozen: LocalDate[] }`
   - `getOwnPromiseView(profile: Profile, now?: Date): Promise<PromiseView | null>`
   - `getPublicPromiseView(profile: PublicProfile, now?: Date): Promise<PublicPromiseView | null>`
-  - `checkIn(profile: Profile, now?: Date): Promise<void>`
+  - `interface CheckInResult { alreadyCheckedIn: boolean; earnedFreeze: boolean }`
+  - `checkIn(profile: Profile, now?: Date): Promise<CheckInResult>`
   - `createProfileAndPromise(...)` — см. задачу 11
 
 **Контекст.** Порядок операций задан [docs/product-spec.md §4.7](../../product-spec.md):
@@ -1504,6 +1929,8 @@ git commit -m "feat: add data access layer for session and profile"
 Публичный профиль не пишет в БД намеренно: анонимный посетитель не должен провоцировать мутации. Следствие зафиксировано в [known-issues.md §2.1](../../known-issues.md).
 
 Списание заморозок и декремент баланса идут в одной транзакции, поэтому расхождение между журналом `streak_freezes` и `users.streak_freezes_balance` невозможно.
+
+Оба DTO отдают не только числа стриков, но и **даты внутри окна цепочки** плюс `startedOn`. Без них экран не построит ленту дней, а без `startedOn` не отличит «пропустил» от «меня тогда ещё не было» (задача 4a). Даты режутся окном прямо здесь, а не на странице: DTO обязан оставаться минимальным ([architecture.md §5](../../architecture.md)), и отдавать наружу 365 записей ради тридцати клеток незачем.
 
 - [ ] **Step 1: Реализовать модуль**
 
@@ -1520,6 +1947,7 @@ import {
   earnedFreezeBalance,
   planFreezes,
 } from '@/lib/streak'
+import { chainWindowStart } from '@/lib/view/chain'
 import type { Profile, PublicProfile } from './user'
 
 export interface PromiseView {
@@ -1531,19 +1959,41 @@ export interface PromiseView {
   currentStreak: number
   bestStreak: number
   freezeBalance: number
+  startedOn: LocalDate | null
+  recentCheckins: LocalDate[]
+  recentFrozen: LocalDate[]
 }
 
 export interface PublicPromiseView {
   title: string
   visibility: string
+  today: LocalDate
   currentStreak: number
   bestStreak: number
+  startedOn: LocalDate | null
+  recentCheckins: LocalDate[]
+  recentFrozen: LocalDate[]
 }
 
 interface PromiseRow {
   id: string
   title: string
   visibility: string
+}
+
+/** The earliest date in the list, or null when it is empty. */
+function earliest(dates: LocalDate[]): LocalDate | null {
+  // LocalDate is always YYYY-MM-DD, so string ordering is date ordering.
+  return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b))
+}
+
+/** Keeps only the dates the chain can show, so the DTO stays small. */
+function withinChainWindow(
+  dates: LocalDate[],
+  today: LocalDate,
+): LocalDate[] {
+  const from = chainWindowStart(today)
+  return dates.filter((date) => date >= from && date <= today)
 }
 
 /** The MVP shows a single promise: the oldest one the user created. */
@@ -1672,24 +2122,35 @@ export async function getOwnPromiseView(
       currentStreak: current,
       bestStreak: best,
       freezeBalance: coverage.freezeBalance,
+      startedOn: earliest(coverage.checkinDates),
+      recentCheckins: withinChainWindow(coverage.checkinDates, today),
+      recentFrozen: withinChainWindow(coverage.frozenDates, today),
     }
   })
+}
+
+export interface CheckInResult {
+  alreadyCheckedIn: boolean
+  earnedFreeze: boolean
 }
 
 /**
  * Records today's check-in and grants a freeze when the streak hits a
  * multiple of seven. Safe to call twice: the unique constraint on
  * (promise_id, local_date) makes the second call a no-op.
+ *
+ * The result is what the UI celebrates with, so it has to say whether a
+ * freeze was actually earned rather than leaving the page to guess.
  */
 export async function checkIn(
   profile: Profile,
   now: Date = new Date(),
-): Promise<void> {
+): Promise<CheckInResult> {
   const today = localDateOf(now, profile.timezone)
 
-  await withUser(profile.id, async (tx) => {
+  return withUser(profile.id, async (tx) => {
     const promise = await selectPrimaryPromise(tx, profile.id)
-    if (!promise) return
+    if (!promise) return { alreadyCheckedIn: false, earnedFreeze: false }
 
     const coverage = await applyPendingFreezes(tx, promise.id, profile, today)
 
@@ -1700,7 +2161,9 @@ export async function checkIn(
       .returning({ id: checkins.id })
 
     // Already checked in today. No new row means no freeze is earned either.
-    if (inserted.length === 0) return
+    if (inserted.length === 0) {
+      return { alreadyCheckedIn: true, earnedFreeze: false }
+    }
 
     const { current } = calculateStreak({
       checkinDates: [...coverage.checkinDates, today],
@@ -1709,12 +2172,16 @@ export async function checkIn(
     })
 
     const nextBalance = earnedFreezeBalance(current, coverage.freezeBalance)
-    if (nextBalance === coverage.freezeBalance) return
+    if (nextBalance === coverage.freezeBalance) {
+      return { alreadyCheckedIn: false, earnedFreeze: false }
+    }
 
     await tx
       .update(users)
       .set({ streak_freezes_balance: nextBalance })
       .where(eq(users.id, profile.id))
+
+    return { alreadyCheckedIn: false, earnedFreeze: true }
   })
 }
 
@@ -1745,8 +2212,12 @@ export async function getPublicPromiseView(
     return {
       title: promise.title,
       visibility: promise.visibility,
+      today,
       currentStreak: current,
       bestStreak: best,
+      startedOn: earliest(checkinDates),
+      recentCheckins: withinChainWindow(checkinDates, today),
+      recentFrozen: withinChainWindow(frozenDates, today),
     }
   })
 }
@@ -1766,16 +2237,1027 @@ git commit -m "feat: add data access layer for promises, check-ins and freezes"
 
 ---
 
+### Task 9a: Дизайн-система
+
+**Files:**
+- Rewrite: `src/app/globals.css`
+- Create: `src/app/nes-theme.css`
+- Rewrite: `src/app/layout.tsx`
+- Create: `src/app/theme-actions.ts`
+- Create: `src/components/ui/panel.tsx`
+- Create: `src/components/ui/pixel-button.tsx`
+- Create: `src/components/ui/field.tsx`
+- Create: `src/components/ui/theme-toggle.tsx`
+
+**Interfaces:**
+- Consumes: ничего
+- Produces:
+  - токены `--color-bg`, `--color-panel`, `--color-ink`, `--color-ink-muted`, `--color-edge`, `--color-streak`, `--color-freeze`, `--color-miss`, `--color-empty`
+  - утилиты Tailwind `bg-bg`, `bg-panel`, `text-ink`, `text-ink-muted`, `border-edge`, `text-streak`, `bg-streak`, `bg-freeze`, `bg-miss`, `bg-empty`
+  - `setTheme(theme: 'light' | 'dark'): Promise<void>` в `src/app/theme-actions.ts`
+  - `Panel({ title?, children, className? })` — default export `src/components/ui/panel.tsx`
+  - `PixelButton({ variant?, full?, ...buttonProps })` — default export, и `pixelButtonClass(variant?, full?): string` — named export `src/components/ui/pixel-button.tsx`
+  - `Field({ id, label, hint?, error?, children })` — default export `src/components/ui/field.tsx`
+  - `ThemeToggle({ stored })` — default export `src/components/ui/theme-toggle.tsx`
+
+**Контекст.** Разбирается дефект, из-за которого тёмная тема сейчас недостижима в принципе.
+
+`node_modules/nes.css/css/nes.min.css` не содержит ни одного `@layer`, а Tailwind 4 объявляет `@layer theme, base, components, utilities` и кладёт туда всё своё. По каскаду **нелейерные правила выигрывают у лейерных** независимо от специфичности и порядка подключения. Проверить можно так:
+
+```bash
+grep -c "@layer" node_modules/nes.css/css/nes.min.css   # 0
+grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "background-color:#fff"
+```
+
+`.nes-btn` жёстко задаёт `color:#212529;background-color:#fff` и перебивает любую Tailwind-утилиту. Плюс NES.css тащит внутри себя Bootstrap Reboot v4.1.3, который подключается после Tailwind и переопределяет его preflight, и подменяет системный курсор base64-картинкой.
+
+Лечится одной строкой: импортом NES.css **в слой**.
+
+Тема живёт в куке и попадает в серверный HTML атрибутом `data-theme`. Это даёт переключатель без мигания при загрузке и без блокирующего inline-скрипта. Медиазапрос `prefers-color-scheme` обслуживает первый визит, атрибут перебивает его в обе стороны — пользователь с системной тёмной темой может выбрать светлую.
+
+Пиксельная сетка отдельных токенов не требует: дефолтная шкала отступов Tailwind (`--spacing: 0.25rem`) — это уже шаг 4px.
+
+- [ ] **Step 1: Переписать `globals.css`**
+
+Заменить содержимое `src/app/globals.css`:
+
+```css
+/*
+ * Layer order is the whole point of this file. NES.css ships unlayered, and
+ * unlayered rules beat layered ones no matter the specificity, so without
+ * `layer(nes)` every Tailwind utility loses to it.
+ */
+@layer theme, base, nes, components, utilities;
+
+@import "tailwindcss";
+@import "nes.css/css/nes.min.css" layer(nes);
+@import "./nes-theme.css" layer(components);
+
+@theme {
+  --font-pixel: var(--font-press-start), "Courier New", monospace;
+  --font-sans: var(--font-pixel);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Light theme. Dark values override these variables further down. */
+  --color-bg: #ebe9e4;
+  --color-panel: #ffffff;
+  --color-ink: #1a1d21;
+  --color-ink-muted: #5b6169;
+  --color-edge: #1a1d21;
+  --color-streak: #b3341c;
+  --color-freeze: #1c5f8f;
+  --color-miss: #b9bec4;
+  --color-empty: #dfe1e4;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /*
+   * The dark palette is written twice on purpose: a media query cannot join a
+   * selector list. The media rule covers the first visit, the attribute rule
+   * lets an explicit choice win in either direction. Keep the two in sync.
+   */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-bg: #14171a;
+      --color-panel: #21262b;
+      --color-ink: #f2f4f6;
+      --color-ink-muted: #a3acb5;
+      --color-edge: #f2f4f6;
+      --color-streak: #ff6b4a;
+      --color-freeze: #5cb8e8;
+      --color-miss: #3a4148;
+      --color-empty: #2a3036;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: #14171a;
+    --color-panel: #21262b;
+    --color-ink: #f2f4f6;
+    --color-ink-muted: #a3acb5;
+    --color-edge: #f2f4f6;
+    --color-streak: #ff6b4a;
+    --color-freeze: #5cb8e8;
+    --color-miss: #3a4148;
+    --color-empty: #2a3036;
+  }
+
+  body {
+    font-family: var(--font-pixel);
+  }
+}
+
+@layer components {
+  /*
+   * The chain. `--chain-n` comes from the component so CHAIN_DAYS stays a
+   * single source of truth; the nth-child count cannot take a variable, so 16
+   * is CHAIN_DAYS - CHAIN_DAYS_COMPACT and must be updated alongside them.
+   *
+   * The trimming applies only to full-length chains, marked with
+   * `data-responsive`. A shorter chain — the ten-day illustration on the
+   * landing page, for instance — would otherwise vanish entirely.
+   */
+  .chain {
+    display: grid;
+    grid-template-columns: repeat(var(--chain-n), minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .chain[data-responsive] > li:nth-child(-n + 16) {
+    display: none;
+  }
+
+  @media (width >= 40rem) {
+    .chain {
+      grid-template-columns: repeat(var(--chain-n-sm), minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .chain[data-responsive] > li:nth-child(-n + 16) {
+      display: block;
+    }
+  }
+
+  .chain > li[data-today][data-state="checked"] {
+    animation: chain-pop 320ms steps(4, end) 1;
+  }
+
+  @keyframes chain-pop {
+    from {
+      transform: scale(0.2);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  /*
+   * The avatar. `.nes-mario` is a fixed 84x96 sprite, so it can only be
+   * resized with a transform — which is safe here because the wrapper's own
+   * width and height already account for the scale.
+   */
+  .avatar-stage {
+    --sprite-w: 84px;
+    --sprite-h: 96px;
+    --sprite-scale: 0.667;
+    position: relative;
+    width: calc(var(--sprite-w) * var(--sprite-scale));
+    height: calc(var(--sprite-h) * var(--sprite-scale));
+  }
+
+  @media (width >= 40rem) {
+    .avatar-stage {
+      --sprite-scale: 1;
+    }
+  }
+
+  .avatar-stage > .nes-mario {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scale(var(--sprite-scale));
+    transform-origin: top left;
+  }
+
+  .avatar-stage[data-stage="dormant"] > .nes-mario {
+    filter: grayscale(1);
+    opacity: 0.45;
+  }
+
+  .avatar-stage[data-stage="running"],
+  .avatar-stage[data-stage="blazing"],
+  .avatar-stage[data-stage="crowned"] {
+    animation: avatar-hop 700ms steps(2, end) infinite;
+  }
+
+  .avatar-stage[data-stage="blazing"],
+  .avatar-stage[data-stage="crowned"] {
+    box-shadow: 0 0 0 4px var(--color-streak);
+  }
+
+  .avatar-stage[data-stage="crowned"]::before {
+    content: "";
+    position: absolute;
+    inset-inline: 25%;
+    top: -10px;
+    height: 6px;
+    background-color: var(--color-streak);
+  }
+
+  @keyframes avatar-hop {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -4px;
+    }
+  }
+}
+```
+
+- [ ] **Step 2: Написать `nes-theme.css`**
+
+Создать `src/app/nes-theme.css`:
+
+```css
+/*
+ * The only place NES.css is overridden. Everything here relies on globals.css
+ * importing NES.css into the `nes` layer, which sits below `components`.
+ */
+
+.nes-container {
+  padding: 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+}
+
+@media (width >= 40rem) {
+  .nes-container {
+    padding: 1.5rem 2rem;
+  }
+}
+
+.nes-container.with-title > .title {
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+}
+
+.nes-btn {
+  /* WCAG target size. NES.css ships 6px/8px padding, which lands under 30px. */
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  cursor: pointer;
+}
+
+.nes-btn.is-primary {
+  color: var(--color-panel);
+  background-color: var(--color-freeze);
+}
+
+.nes-btn.is-success {
+  color: var(--color-panel);
+  background-color: var(--color-streak);
+}
+
+.nes-input,
+.nes-textarea,
+.nes-select select {
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+}
+
+/*
+ * NES.css replaces the system cursor with a base64 PNG on html and on every
+ * button. That overrides the user's cursor size and contrast settings, which
+ * some people depend on.
+ */
+html,
+.nes-btn,
+.nes-input,
+.nes-select select {
+  cursor: auto;
+}
+
+.nes-btn {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-streak);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+- [ ] **Step 3: Написать server action темы**
+
+Создать `src/app/theme-actions.ts`:
+
+```ts
+'use server'
+
+import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
+
+export async function setTheme(theme: 'light' | 'dark'): Promise<void> {
+  const store = await cookies()
+
+  store.set('theme', theme, {
+    maxAge: ONE_YEAR_SECONDS,
+    path: '/',
+    sameSite: 'lax',
+  })
+
+  // The attribute lives on <html> in the root layout, so every route re-renders.
+  revalidatePath('/', 'layout')
+}
+```
+
+- [ ] **Step 4: Переписать корневой layout**
+
+Заменить содержимое `src/app/layout.tsx`:
+
+```tsx
+import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { Press_Start_2P } from 'next/font/google'
+import './globals.css'
+
+// The `cyrillic` subset is gone: the interface is English only.
+const pressStart2P = Press_Start_2P({
+  weight: '400',
+  variable: '--font-press-start',
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export const metadata: Metadata = {
+  title: 'never-give.app',
+  description: 'Promise publicly. Check in daily. Do not break the chain.',
+}
+
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  // Reading the cookie here puts data-theme into the initial HTML, so there is
+  // no flash of the wrong theme and no blocking inline script.
+  const stored = (await cookies()).get('theme')?.value
+  const theme = stored === 'dark' || stored === 'light' ? stored : undefined
+
+  return (
+    <html
+      lang="en"
+      data-theme={theme}
+      className={`${pressStart2P.variable} h-full antialiased`}
+    >
+      <body className="flex min-h-full flex-col bg-bg text-ink">{children}</body>
+    </html>
+  )
+}
+```
+
+- [ ] **Step 5: Написать примитивы**
+
+Создать `src/components/ui/panel.tsx`:
+
+```tsx
+import type { ReactNode } from 'react'
+
+interface PanelProps {
+  title?: string
+  className?: string
+  children: ReactNode
+}
+
+export default function Panel({ title, className = '', children }: PanelProps) {
+  return (
+    <section
+      className={`nes-container ${title ? 'with-title' : ''} ${className}`}
+    >
+      {title ? <p className="title">{title}</p> : null}
+      {children}
+    </section>
+  )
+}
+```
+
+Создать `src/components/ui/pixel-button.tsx`:
+
+```tsx
+import type { ComponentProps } from 'react'
+
+export type PixelVariant = 'default' | 'primary' | 'success' | 'warning'
+
+const VARIANT_CLASS: Record<PixelVariant, string> = {
+  default: '',
+  primary: 'is-primary',
+  success: 'is-success',
+  warning: 'is-warning',
+}
+
+/** Shared with links that need to look like buttons. */
+export function pixelButtonClass(
+  variant: PixelVariant = 'default',
+  full = false,
+): string {
+  return [
+    'nes-btn',
+    VARIANT_CLASS[variant],
+    full ? 'w-full' : '',
+    'inline-flex items-center justify-center',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+interface PixelButtonProps extends ComponentProps<'button'> {
+  variant?: PixelVariant
+  full?: boolean
+}
+
+export default function PixelButton({
+  variant = 'default',
+  full = false,
+  className = '',
+  type = 'button',
+  ...rest
+}: PixelButtonProps) {
+  return (
+    <button
+      {...rest}
+      type={type}
+      className={`${pixelButtonClass(variant, full)} ${className}`}
+    />
+  )
+}
+```
+
+Создать `src/components/ui/field.tsx`:
+
+```tsx
+import type { ReactNode } from 'react'
+
+interface FieldProps {
+  id: string
+  label: string
+  hint?: ReactNode
+  error?: string
+  children: ReactNode
+}
+
+/**
+ * Renders the label, hint and error around a control.
+ *
+ * The ids are conventional: the control itself must carry
+ * `aria-describedby="<id>-hint <id>-error"` and `aria-invalid` — a wrapper
+ * cannot set attributes on a child it does not own.
+ */
+export default function Field({
+  id,
+  label,
+  hint,
+  error,
+  children,
+}: FieldProps) {
+  return (
+    <div className="nes-field">
+      <label htmlFor={id}>{label}</label>
+      {children}
+      {hint ? (
+        <span
+          id={`${id}-hint`}
+          className="mt-2 block font-mono text-xs text-ink-muted"
+        >
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span
+          id={`${id}-error`}
+          role="alert"
+          className="mt-2 block font-mono text-xs text-streak"
+        >
+          {error}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+```
+
+Создать `src/components/ui/theme-toggle.tsx`:
+
+```tsx
+'use client'
+
+import { useEffect, useState, useTransition } from 'react'
+import { setTheme } from '@/app/theme-actions'
+
+type Theme = 'light' | 'dark'
+
+export default function ThemeToggle({ stored }: { stored: Theme | null }) {
+  const [effective, setEffective] = useState<Theme | null>(stored)
+  const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    // With no cookie the media query decides what is actually on screen, and
+    // only the browser knows that.
+    if (stored) return
+    setEffective(
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light',
+    )
+  }, [stored])
+
+  const next: Theme = effective === 'dark' ? 'light' : 'dark'
+
+  return (
+    <button
+      type="button"
+      className="nes-btn"
+      aria-label={`Switch to ${next} theme`}
+      aria-busy={pending}
+      onClick={() => {
+        setEffective(next)
+        startTransition(() => setTheme(next))
+      }}
+    >
+      {next === 'dark' ? 'DARK' : 'LIGHT'}
+    </button>
+  )
+}
+```
+
+- [ ] **Step 6: Проверить компиляцию**
+
+Run: `npx tsc --noEmit && npm run lint`
+Expected: без ошибок.
+
+- [ ] **Step 7: Проверить, что каскад починен**
+
+Это главная проверка задачи. Без неё всё остальное — вёрстка поверх сломанного фундамента.
+
+Run: `npm run dev`
+
+Открыть любую страницу, где есть `.nes-btn` (например `/`), в DevTools выбрать кнопку и посмотреть вычисленный `background-color`.
+
+Expected: цвет берётся из `nes-theme.css`, а правило `background-color:#fff` из `nes.min.css` показано **перечёркнутым** как перебитое. Если оно всё ещё побеждает — слой `nes` не применился; в этом случае перенести объявление `@layer theme, base, nes, components, utilities;` **после** `@import "tailwindcss"` и повторить проверку.
+
+Затем в консоли DevTools:
+
+```js
+document.documentElement.setAttribute('data-theme', 'dark')
+```
+
+Expected: фон страницы и панелей темнеет немедленно, текст остаётся читаемым. Вернуть: `document.documentElement.removeAttribute('data-theme')`.
+
+- [ ] **Step 8: Проверить контраст**
+
+Значения токенов подобраны так, чтобы проходить WCAG AA (4.5:1 для обычного текста). Проверить пипеткой в DevTools или любым калькулятором контраста:
+
+| Пара | Тема | Ожидается |
+|---|---|---|
+| `--color-ink-muted` на `--color-panel` | светлая | ≈ 6.2:1 |
+| `--color-streak` на `--color-panel` | светлая | ≈ 6.1:1 |
+| `--color-freeze` на `--color-panel` | светлая | ≈ 6.8:1 |
+| `--color-ink-muted` на `--color-panel` | тёмная | ≈ 6.6:1 |
+| `--color-streak` на `--color-panel` | тёмная | ≈ 5.4:1 |
+| `--color-freeze` на `--color-panel` | тёмная | ≈ 6.9:1 |
+
+Expected: каждая пара не ниже 4.5:1. Если ниже — правится токен, а не отменяется проверка.
+
+- [ ] **Step 9: Коммит**
+
+```bash
+git add src/app/globals.css src/app/nes-theme.css src/app/layout.tsx src/app/theme-actions.ts src/components/ui/
+git commit -m "feat: add design tokens, layered NES.css override and theme switching"
+```
+
+---
+
+### Task 9b: Доменные компоненты
+
+**Files:**
+- Create: `src/components/streak/streak-chain.tsx`
+- Create: `src/components/streak/streak-stats.tsx`
+- Create: `src/components/streak/freeze-meter.tsx`
+- Create: `src/components/streak/avatar-stage.tsx`
+- Create: `src/components/layout/app-header.tsx`
+- Create: `src/components/layout/app-menu.tsx`
+- Create: `src/components/share/share-bar.tsx`
+- Create: `src/app/logout-actions.ts`
+
+**Interfaces:**
+- Consumes: `Cell`, `CHAIN_DAYS`, `CHAIN_DAYS_COMPACT`, `summarizeChain` из `src/lib/view/chain.ts`; `stageOf`, `daysToNextStage` из `src/lib/view/stage.ts`; `MAX_FREEZE_BALANCE` из `src/lib/streak.ts`; `ThemeToggle`, `pixelButtonClass` из `src/components/ui/`
+- Produces:
+  - `StreakChain({ cells })` — default export
+  - `StreakStats({ current, best })` — default export
+  - `FreezeMeter({ balance })` — default export
+  - `AvatarStage({ currentStreak })` — default export
+  - `AppHeader({ username?, theme })` — default export
+  - `ShareBar({ url, title })` — default export
+  - `signOut(): Promise<void>` в `src/app/logout-actions.ts`
+  - атрибуты `data-testid="current-streak"`, `data-testid="best-streak"`, `data-testid="freeze-balance"`, `data-testid="chain"` — на них опираются E2E-тесты в задаче 14
+
+**Контекст.** Дашборд и публичный профиль показывают одни и те же сущности. Собранные здесь компоненты — единственное место, где они верстаются; страницы в задачах 10 и 12 только компонуют.
+
+Из всего набора клиентские только два: меню и панель шаринга. Цепочка, статы, заморозки и аватар остаются серверными — состояния у них нет.
+
+- [ ] **Step 1: Написать цепочку**
+
+Создать `src/components/streak/streak-chain.tsx`:
+
+```tsx
+import type { CSSProperties } from 'react'
+import {
+  CHAIN_DAYS,
+  CHAIN_DAYS_COMPACT,
+  summarizeChain,
+  type Cell,
+} from '@/lib/view/chain'
+
+const STATE_CLASS: Record<Cell['state'], string> = {
+  checked: 'bg-streak',
+  frozen: 'bg-freeze',
+  missed: 'bg-miss',
+  empty: 'bg-empty',
+}
+
+export default function StreakChain({ cells }: { cells: Cell[] }) {
+  const summary = summarizeChain(cells)
+  const lastDate = cells.length > 0 ? cells[cells.length - 1].date : null
+
+  // Only a full-length chain gets trimmed below `sm`. A shorter one — the
+  // ten-day illustration on the landing page — must render whole at every
+  // width, or the CSS rule would hide all of it.
+  const responsive = cells.length === CHAIN_DAYS
+
+  // Thirty list items would be thirty announcements. One summary is the point.
+  const label =
+    `Last ${cells.length} days: ${summary.checked} checked in, ` +
+    `${summary.frozen} frozen, ${summary.missed} missed.`
+
+  return (
+    <div className="min-w-0">
+      <ol
+        role="img"
+        aria-label={label}
+        data-testid="chain"
+        data-responsive={responsive ? '' : undefined}
+        className="chain"
+        style={
+          {
+            '--chain-n': responsive ? CHAIN_DAYS_COMPACT : cells.length,
+            '--chain-n-sm': cells.length,
+          } as CSSProperties
+        }
+      >
+        {cells.map((cell) => (
+          <li
+            key={cell.date}
+            aria-hidden="true"
+            data-state={cell.state}
+            data-today={cell.date === lastDate ? '' : undefined}
+            className={`aspect-square border-2 border-edge ${STATE_CLASS[cell.state]}`}
+          />
+        ))}
+      </ol>
+
+      <p
+        aria-hidden="true"
+        className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-muted"
+      >
+        <span>
+          <span className="mr-1 inline-block size-2 bg-streak align-middle" />
+          check-in
+        </span>
+        <span>
+          <span className="mr-1 inline-block size-2 bg-freeze align-middle" />
+          freeze
+        </span>
+        <span>
+          <span className="mr-1 inline-block size-2 bg-miss align-middle" />
+          missed
+        </span>
+      </p>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Написать статы, заморозки и аватар**
+
+Создать `src/components/streak/streak-stats.tsx`:
+
+```tsx
+const NUMBER_CLASS = 'leading-none [font-size:clamp(1.75rem,10vw,3.5rem)]'
+
+interface StreakStatsProps {
+  current: number
+  best: number
+}
+
+export default function StreakStats({ current, best }: StreakStatsProps) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div className="min-w-0 text-center">
+        <p className={`text-streak ${NUMBER_CLASS}`} data-testid="current-streak">
+          {current}
+        </p>
+        <p className="mt-2 font-mono text-xs text-ink-muted">CURRENT</p>
+      </div>
+      <div className="min-w-0 text-center">
+        <p className={NUMBER_CLASS} data-testid="best-streak">
+          {best}
+        </p>
+        <p className="mt-2 font-mono text-xs text-ink-muted">BEST</p>
+      </div>
+    </div>
+  )
+}
+```
+
+Создать `src/components/streak/freeze-meter.tsx`:
+
+```tsx
+import { MAX_FREEZE_BALANCE } from '@/lib/streak'
+
+export default function FreezeMeter({ balance }: { balance: number }) {
+  const pips = Array.from({ length: MAX_FREEZE_BALANCE }, (_, index) =>
+    index < balance ? '*' : '-',
+  ).join(' ')
+
+  return (
+    <p className="font-mono text-xs text-ink-muted">
+      FREEZES{' '}
+      <span aria-hidden="true" className="text-freeze">
+        {pips}
+      </span>
+      <span className="sr-only">
+        <span data-testid="freeze-balance">{balance}</span> of{' '}
+        {MAX_FREEZE_BALANCE} available
+      </span>
+    </p>
+  )
+}
+```
+
+Создать `src/components/streak/avatar-stage.tsx`:
+
+```tsx
+import { daysToNextStage, stageOf } from '@/lib/view/stage'
+
+export default function AvatarStage({ currentStreak }: { currentStreak: number }) {
+  const stage = stageOf(currentStreak)
+  const remaining = daysToNextStage(currentStreak)
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="avatar-stage" data-stage={stage} data-testid="avatar">
+        <i className="nes-mario" aria-hidden="true" />
+      </div>
+      <p className="font-mono text-xs text-ink-muted">
+        {remaining === null
+          ? 'Final form reached.'
+          : `${remaining} more ${remaining === 1 ? 'day' : 'days'} to the next form.`}
+      </p>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 3: Написать выход из аккаунта**
+
+Создать `src/app/logout-actions.ts`:
+
+```ts
+'use server'
+
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+
+export async function signOut(): Promise<void> {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+
+  // Outside any try/catch: redirect() throws a control-flow exception.
+  redirect('/')
+}
+```
+
+- [ ] **Step 4: Написать шапку и меню**
+
+Создать `src/components/layout/app-menu.tsx`:
+
+```tsx
+'use client'
+
+import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+import { signOut } from '@/app/logout-actions'
+
+export default function AppMenu({ username }: { username: string }) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [open])
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        className="nes-btn"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Account menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        MENU
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="nes-container absolute right-0 z-10 mt-2 flex w-56 flex-col gap-2"
+        >
+          <Link
+            role="menuitem"
+            href={`/${username}`}
+            className="font-mono text-xs underline"
+          >
+            View public profile
+          </Link>
+          <form action={signOut}>
+            <button
+              role="menuitem"
+              type="submit"
+              className="font-mono text-xs underline"
+            >
+              Log out
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+```
+
+Создать `src/components/layout/app-header.tsx`:
+
+```tsx
+import Link from 'next/link'
+import ThemeToggle from '@/components/ui/theme-toggle'
+import AppMenu from './app-menu'
+
+interface AppHeaderProps {
+  /** Omitted for signed-out visitors: there is no menu to show them. */
+  username?: string
+  theme: 'light' | 'dark' | null
+}
+
+export default function AppHeader({ username, theme }: AppHeaderProps) {
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <Link href="/" className="min-w-0 truncate">
+        never-give.app
+      </Link>
+
+      <div className="flex items-center gap-2">
+        {username ? (
+          <span className="hidden font-mono text-xs text-ink-muted sm:inline">
+            @{username}
+          </span>
+        ) : null}
+        <ThemeToggle stored={theme} />
+        {username ? <AppMenu username={username} /> : null}
+      </div>
+    </header>
+  )
+}
+```
+
+- [ ] **Step 5: Написать панель шаринга**
+
+Создать `src/components/share/share-bar.tsx`:
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+import PixelButton from '@/components/ui/pixel-button'
+
+interface ShareBarProps {
+  url: string
+  title: string
+}
+
+export default function ShareBar({ url, title }: ShareBarProps) {
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard access can be denied. The links below still work.
+      setCopied(false)
+    }
+  }
+
+  async function share() {
+    // navigator.share exists mostly on mobile; elsewhere fall back to copying.
+    if (typeof navigator.share !== 'function') return copy()
+
+    try {
+      await navigator.share({ title, url })
+    } catch {
+      // The user dismissed the sheet. Nothing to do.
+    }
+  }
+
+  const text = encodeURIComponent(title)
+  const target = encodeURIComponent(url)
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <PixelButton variant="primary" onClick={share}>
+        SHARE
+      </PixelButton>
+      <PixelButton onClick={copy} aria-live="polite">
+        {copied ? 'COPIED' : 'COPY LINK'}
+      </PixelButton>
+      <a
+        className="nes-btn inline-flex items-center justify-center"
+        href={`https://x.com/intent/tweet?text=${text}&url=${target}`}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        X
+      </a>
+      <a
+        className="nes-btn inline-flex items-center justify-center"
+        href={`https://t.me/share/url?url=${target}&text=${text}`}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        TG
+      </a>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 6: Проверить компиляцию**
+
+Run: `npx tsc --noEmit && npm run lint`
+Expected: без ошибок.
+
+- [ ] **Step 7: Коммит**
+
+```bash
+git add src/components/ src/app/logout-actions.ts
+git commit -m "feat: add streak, layout and share components"
+```
+
+---
+
 ### Task 10: Дашборд
 
 **Files:**
 - Rewrite: `src/app/dashboard/page.tsx`
 - Create: `src/app/dashboard/actions.ts`
+- Create: `src/app/dashboard/checkin-form.tsx`
 - Create: `src/app/dashboard/error.tsx`
 
 **Interfaces:**
-- Consumes: `requireSessionUser` из `src/lib/dal/session.ts`; `getProfile` из `src/lib/dal/user.ts`; `getOwnPromiseView`, `checkIn` из `src/lib/dal/promise.ts`
-- Produces: атрибуты `data-testid="current-streak"`, `data-testid="best-streak"`, `data-testid="freeze-balance"` — на них опираются E2E-тесты в задаче 14
+- Consumes: `requireSessionUser` из `src/lib/dal/session.ts`; `getProfile` из `src/lib/dal/user.ts`; `getOwnPromiseView`, `checkIn` из `src/lib/dal/promise.ts`; `buildChain` из `src/lib/view/chain.ts`; `AppHeader`, `Panel`, `PixelButton`, `AvatarStage`, `FreezeMeter`, `StreakChain`, `StreakStats` из `src/components/`
+- Produces:
+  - `type CheckInState = { status: 'idle' } | { status: 'ok'; earnedFreeze: boolean } | { status: 'error'; message: string }`
+  - `checkInAction(prevState: CheckInState, formData: FormData): Promise<CheckInState>`
+  - `CheckInForm({ checkedInToday, timezone })` — default export
 
 **Контекст.** Чинятся дефекты 1.1, 1.2, 1.3, 1.6 из [known-issues.md](../../known-issues.md). Ключевые изменения:
 
@@ -1783,6 +3265,10 @@ git commit -m "feat: add data access layer for promises, check-ins and freezes"
 - фиктивные данные при сбое БД убираются: исключение доходит до `error.tsx`
 - локальная копия `calculateStreak` удаляется, расчёт берётся из DAL
 - server action переезжает в отдельный файл: инлайн-замыкание над `dbPromise` и `dbUser` было ещё одним источником рассинхронизации
+
+Раскладка — одна колонка `max-w-[42rem]` на всех ширинах ([спека §4.2](../specs/2026-08-06-frontend-design.md)). Порядок блоков: обещание → аватар → статы → кнопка → цепочка → заморозки. Кнопка стоит выше цепочки намеренно: так она попадает в первый экран на 320px без прокрутки.
+
+Кнопка с `disabled` заменяется на **другую разметку**: если отмечаться уже не нужно, действия нет, значит нет и кнопки. `disabled`-кнопка выпадает из порядка табуляции и не сообщает причину.
 
 - [ ] **Step 1: Написать server action**
 
@@ -1795,20 +3281,38 @@ import { revalidatePath } from 'next/cache'
 import { getProfile } from '@/lib/dal/user'
 import { checkIn } from '@/lib/dal/promise'
 
+export type CheckInState =
+  | { status: 'idle' }
+  | { status: 'ok'; earnedFreeze: boolean }
+  | { status: 'error'; message: string }
+
 /**
  * Records today's check-in.
  *
  * Server Actions are reachable by direct POST, not only through the UI, so
  * authorization is re-established here rather than trusted from the page.
+ *
+ * Failures are returned, not thrown: a thrown error would replace the whole
+ * dashboard with the error boundary over what is a retryable hiccup.
  */
-export async function checkInAction(): Promise<void> {
+export async function checkInAction(
+  _prevState: CheckInState,
+  _formData: FormData,
+): Promise<CheckInState> {
   const profile = await getProfile()
-  if (!profile) return
+  if (!profile) return { status: 'error', message: 'Please sign in again.' }
 
-  await checkIn(profile)
+  try {
+    const result = await checkIn(profile)
 
-  revalidatePath('/dashboard')
-  revalidatePath(`/${profile.username}`)
+    revalidatePath('/dashboard')
+    revalidatePath(`/${profile.username}`)
+
+    return { status: 'ok', earnedFreeze: result.earnedFreeze }
+  } catch (error) {
+    console.error('Check-in failed', error)
+    return { status: 'error', message: 'Could not check in. Please try again.' }
+  }
 }
 ```
 
@@ -1820,6 +3324,8 @@ export async function checkInAction(): Promise<void> {
 'use client' // Error boundaries must be Client Components
 
 import { useEffect } from 'react'
+import Panel from '@/components/ui/panel'
+import PixelButton from '@/components/ui/pixel-button'
 
 export default function DashboardError({
   error,
@@ -1833,16 +3339,18 @@ export default function DashboardError({
   }, [error])
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-[#212529]">
-      <div className="nes-container with-title is-centered max-w-lg w-full bg-white text-black">
-        <p className="title">Game Over</p>
-        <p className="mb-8">
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <Panel
+        title="GAME OVER"
+        className="flex flex-col items-center gap-6 text-center"
+      >
+        <p className="font-mono text-sm">
           We could not load your quest. This is on us, not on your streak.
         </p>
-        <button type="button" className="nes-btn is-warning" onClick={() => retry()}>
+        <PixelButton variant="warning" onClick={() => retry()}>
           Try again
-        </button>
-      </div>
+        </PixelButton>
+      </Panel>
     </main>
   )
 }
@@ -1850,18 +3358,94 @@ export default function DashboardError({
 
 Проп называется `retry`, а не `reset` — это изменение Next.js 16.
 
-- [ ] **Step 3: Переписать страницу**
+- [ ] **Step 3: Написать форму чек-ина**
+
+Создать `src/app/dashboard/checkin-form.tsx`:
+
+```tsx
+'use client'
+
+import { useActionState } from 'react'
+import PixelButton from '@/components/ui/pixel-button'
+import { checkInAction, type CheckInState } from './actions'
+
+const INITIAL_STATE: CheckInState = { status: 'idle' }
+
+interface CheckInFormProps {
+  checkedInToday: boolean
+  timezone: string
+}
+
+export default function CheckInForm({
+  checkedInToday,
+  timezone,
+}: CheckInFormProps) {
+  const [state, action, pending] = useActionState(checkInAction, INITIAL_STATE)
+
+  // No action to offer means no button. A disabled button leaves the tab order
+  // and announces nothing about why it is unavailable.
+  //
+  // The wording says "after midnight" rather than counting hours down: an hour
+  // count rendered on the server goes stale on screen until the next
+  // revalidation, while midnight in the user's own timezone is always true.
+  if (checkedInToday) {
+    return (
+      <div className="w-full text-center">
+        <p role="status" className="border-4 border-edge p-3">
+          DONE FOR TODAY
+        </p>
+        <p className="mt-2 font-mono text-xs text-ink-muted">
+          Next check-in after midnight ({timezone}).
+        </p>
+        {state.status === 'ok' && state.earnedFreeze ? (
+          <p role="status" className="mt-2 font-mono text-xs text-freeze">
+            +1 FREEZE
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <form action={action} className="w-full text-center">
+      <PixelButton type="submit" variant="success" full aria-busy={pending}>
+        {pending ? 'CHECKING IN...' : 'CHECK IN TODAY'}
+      </PixelButton>
+      {state.status === 'error' ? (
+        <p role="alert" className="mt-2 font-mono text-xs text-streak">
+          {state.message}
+        </p>
+      ) : null}
+    </form>
+  )
+}
+```
+
+После успешного чек-ина `revalidatePath` перерисовывает страницу, `checkedInToday` становится `true`, и компонент переключается на вторую ветку. Состояние `useActionState` при этом сохраняется — поэтому `+1 FREEZE` виден именно там.
+
+- [ ] **Step 4: Переписать страницу**
 
 Заменить содержимое `src/app/dashboard/page.tsx`:
 
 ```tsx
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import AppHeader from '@/components/layout/app-header'
+import AvatarStage from '@/components/streak/avatar-stage'
+import FreezeMeter from '@/components/streak/freeze-meter'
+import StreakChain from '@/components/streak/streak-chain'
+import StreakStats from '@/components/streak/streak-stats'
+import Panel from '@/components/ui/panel'
 import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
-import { MAX_FREEZE_BALANCE } from '@/lib/streak'
-import { checkInAction } from './actions'
+import { buildChain } from '@/lib/view/chain'
+import CheckInForm from './checkin-form'
+
+function storedTheme(value: string | undefined): 'light' | 'dark' | null {
+  return value === 'light' || value === 'dark' ? value : null
+}
 
 export default async function DashboardPage() {
   await requireSessionUser()
@@ -1875,88 +3459,100 @@ export default async function DashboardPage() {
   const promise = await getOwnPromiseView(profile)
   if (!promise) redirect('/onboarding')
 
+  const theme = storedTheme((await cookies()).get('theme')?.value)
+
+  const cells = buildChain({
+    today: promise.today,
+    checkinDates: promise.recentCheckins,
+    frozenDates: promise.recentFrozen,
+    startedOn: promise.startedOn,
+  })
+
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-[#212529] text-white">
-      <div className="max-w-4xl mx-auto flex flex-col gap-8">
-        <header className="flex flex-col md:flex-row justify-between items-center bg-white p-4 nes-container is-rounded">
-          <div className="text-black text-center md:text-left mb-4 md:mb-0">
-            <h1 className="text-2xl mb-1">never-give.app</h1>
-            <p className="text-gray-500 text-sm">Player: {profile.username}</p>
-          </div>
-          <div className="flex gap-4">
-            <Link href={`/${profile.username}`} className="nes-btn is-primary">
-              View Public
-            </Link>
-          </div>
-        </header>
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <AppHeader username={profile.username} theme={theme} />
 
-        <section className="nes-container with-title bg-white text-black">
-          <p className="title">Active Quest</p>
-          <h2 className="text-2xl mb-8 text-center">{promise.title}</h2>
+      <Panel title="ACTIVE QUEST" className="flex flex-col items-center gap-6">
+        <h1 className="min-w-0 text-balance text-center [font-size:clamp(0.75rem,3.5vw,1.25rem)] [overflow-wrap:anywhere]">
+          {promise.title}
+        </h1>
 
-          <div className="flex flex-col md:flex-row justify-around items-center gap-8 mb-12">
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Current Streak</p>
-              <p className="text-5xl text-red-500" data-testid="current-streak">
-                {promise.currentStreak}
-              </p>
-            </div>
+        <AvatarStage currentStreak={promise.currentStreak} />
 
-            <div className="flex flex-col items-center">
-              <i
-                className={`nes-mario ${
-                  promise.currentStreak > 0 && !promise.checkedInToday ? 'is-moving' : ''
-                } mb-4`}
-                style={{ transform: 'scale(2)' }}
-              />
-              <p className="text-sm mt-4">Lvl {profile.avatarLevel}</p>
-            </div>
+        <div className="w-full">
+          <StreakStats
+            current={promise.currentStreak}
+            best={promise.bestStreak}
+          />
+        </div>
 
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Best Streak</p>
-              <p className="text-5xl" data-testid="best-streak">
-                {promise.bestStreak}
-              </p>
-            </div>
-          </div>
+        <CheckInForm
+          checkedInToday={promise.checkedInToday}
+          timezone={profile.timezone}
+        />
 
-          <p className="text-center text-sm text-gray-500 mb-8">
-            Streak freezes:{' '}
-            <span data-testid="freeze-balance">{promise.freezeBalance}</span> /{' '}
-            {MAX_FREEZE_BALANCE} — one is earned every 7 days and spent
-            automatically on a missed day.
+        <div className="w-full">
+          <StreakChain cells={cells} />
+        </div>
+
+        {promise.startedOn === null ? (
+          <p className="font-mono text-xs text-ink-muted">
+            Your chain starts today.
           </p>
+        ) : null}
 
-          <form action={checkInAction} className="flex justify-center">
-            <button
-              type="submit"
-              className={`nes-btn is-large text-xl px-12 py-4 ${
-                promise.checkedInToday ? 'is-disabled' : 'is-success'
-              }`}
-              disabled={promise.checkedInToday}
-            >
-              {promise.checkedInToday ? 'DONE FOR TODAY' : 'CHECK IN TODAY'}
-            </button>
-          </form>
-        </section>
-      </div>
+        {promise.startedOn !== null &&
+        promise.currentStreak === 0 &&
+        promise.bestStreak > 0 ? (
+          <p className="font-mono text-xs text-ink-muted">
+            Your chain broke at {promise.bestStreak} days. Start again.
+          </p>
+        ) : null}
+
+        <FreezeMeter balance={promise.freezeBalance} />
+      </Panel>
+
+      <p className="text-center">
+        <Link
+          href={`/${profile.username}`}
+          className="font-mono text-xs underline"
+        >
+          View public profile
+        </Link>
+      </p>
     </main>
   )
 }
 ```
 
-- [ ] **Step 4: Проверить компиляцию и сборку**
+`profile.avatarLevel` больше не выводится: механики прокачки нет и в MVP не будет ([known-issues.md 1.14](../../known-issues.md)). Стадию аватара определяет длина стрика.
+
+- [ ] **Step 5: Проверить компиляцию и сборку**
 
 Run: `npx tsc --noEmit && npm run lint`
 Expected: без ошибок в `src/app/dashboard/`.
 
-- [ ] **Step 5: Проверить вручную**
+- [ ] **Step 6: Проверить вручную**
 
 Run: `npm run dev`
 
-Открыть `http://localhost:3000/dashboard` под существующим пользователем. Ожидается: экран отрисован, кнопка чек-ина активна, нажатие увеличивает текущий стрик на 1, кнопка становится `DONE FOR TODAY`. Повторная перезагрузка стрик не меняет.
+Открыть `http://localhost:3000/dashboard` под существующим пользователем.
 
-- [ ] **Step 6: Коммит**
+Ожидается:
+
+- экран отрисован, кнопка чек-ина активна;
+- нажатие увеличивает текущий стрик на 1, последнее звено цепочки коротко проявляется, вместо кнопки появляется `DONE FOR TODAY` с указанием таймзоны;
+- повторная перезагрузка стрик не меняет.
+
+Затем в DevTools включить эмуляцию мобильного и проверить ширины **320, 375, 768, 1280**. На каждой:
+
+- горизонтальной прокрутки нет;
+- цепочка показывает 14 клеток ниже 640px и 30 от 640px;
+- кнопка чек-ина видна без прокрутки на 320px.
+
+Проверить переключатель темы: обе темы читаемы, выбор переживает перезагрузку страницы.
+
+- [ ] **Step 7: Коммит**
 
 ```bash
 git add src/app/dashboard/
@@ -1977,7 +3573,7 @@ git commit -m "fix: rebuild dashboard on the data access layer"
 - Consumes: `requireSessionUser` из `src/lib/dal/session.ts`; `getProfile` из `src/lib/dal/user.ts`; `validateUsername` из `src/lib/validation.ts`
 - Produces:
   - `createProfileAndPromise(session: SessionUser, input: OnboardingInput): Promise<OnboardingError | null>` в `src/lib/dal/promise.ts`
-  - `type OnboardingError = 'invalid_username' | 'reserved_username' | 'username_taken' | 'empty_promise' | 'unknown'`
+  - `type OnboardingError = 'invalid_username' | 'reserved_username' | 'username_taken' | 'empty_promise' | 'promise_too_long' | 'unknown'`
   - `interface OnboardingState { error?: string }`
   - `completeOnboarding(prevState: OnboardingState, formData: FormData): Promise<OnboardingState>`
 
@@ -1995,6 +3591,7 @@ export type OnboardingError =
   | 'reserved_username'
   | 'username_taken'
   | 'empty_promise'
+  | 'promise_too_long'
   | 'unknown'
 
 export interface OnboardingInput {
@@ -2037,8 +3634,11 @@ export async function createProfileAndPromise(
   if (usernameError === 'invalid_format') return 'invalid_username'
   if (usernameError === 'reserved') return 'reserved_username'
 
+  const titleError = validatePromiseTitle(input.promiseTitle)
+  if (titleError === 'empty') return 'empty_promise'
+  if (titleError === 'too_long') return 'promise_too_long'
+
   const title = input.promiseTitle.trim()
-  if (title.length === 0) return 'empty_promise'
 
   const visibility = input.visibility === 'unlisted' ? 'unlisted' : 'public'
 
@@ -2086,7 +3686,7 @@ export async function createProfileAndPromise(
 Добавить в импорты в начале `src/lib/dal/promise.ts`:
 
 ```ts
-import { validateUsername } from '@/lib/validation'
+import { validatePromiseTitle, validateUsername } from '@/lib/validation'
 ```
 
 - [ ] **Step 2: Написать server action**
@@ -2102,6 +3702,7 @@ import {
   createProfileAndPromise,
   type OnboardingError,
 } from '@/lib/dal/promise'
+import { PROMISE_MAX_LENGTH } from '@/lib/validation'
 
 export interface OnboardingState {
   error?: string
@@ -2113,6 +3714,7 @@ const MESSAGES: Record<OnboardingError, string> = {
   reserved_username: 'That username is reserved. Pick another one.',
   username_taken: 'This username is already taken.',
   empty_promise: 'Describe what you are committing to.',
+  promise_too_long: `Keep it under ${PROMISE_MAX_LENGTH} characters.`,
   unknown: 'Something went wrong. Please try again.',
 }
 
@@ -2143,7 +3745,10 @@ export async function completeOnboarding(
 ```tsx
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
+import Field from '@/components/ui/field'
+import PixelButton from '@/components/ui/pixel-button'
+import { PROMISE_MAX_LENGTH } from '@/lib/validation'
 import { completeOnboarding, type OnboardingState } from './actions'
 
 const INITIAL_STATE: OnboardingState = {}
@@ -2154,6 +3759,8 @@ export default function OnboardingForm() {
     INITIAL_STATE,
   )
   const timezoneRef = useRef<HTMLInputElement>(null)
+  const [username, setUsername] = useState('')
+  const [promiseLength, setPromiseLength] = useState(0)
 
   useEffect(() => {
     if (timezoneRef.current) {
@@ -2164,14 +3771,17 @@ export default function OnboardingForm() {
 
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.error && (
-        <p className="nes-text is-error" aria-live="polite">
+      {state.error ? (
+        <p role="alert" className="font-mono text-xs text-streak">
           {state.error}
         </p>
-      )}
+      ) : null}
 
-      <div className="nes-field">
-        <label htmlFor="username">Choose a Username</label>
+      <Field
+        id="username"
+        label="Choose a username"
+        hint={`never-give.app/${username || 'username'}`}
+      >
         <input
           type="text"
           id="username"
@@ -2181,15 +3791,19 @@ export default function OnboardingForm() {
           minLength={3}
           maxLength={20}
           pattern="[a-zA-Z0-9_]+"
+          autoComplete="off"
           title="Letters, digits and underscores, 3-20 characters"
+          aria-describedby="username-hint"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
         />
-        <span className="text-xs text-gray-500 block mt-2">
-          never-give.app/username
-        </span>
-      </div>
+      </Field>
 
-      <div className="nes-field">
-        <label htmlFor="promise">Your Main Promise</label>
+      <Field
+        id="promise"
+        label="Your main promise"
+        hint={`${promiseLength} / ${PROMISE_MAX_LENGTH}`}
+      >
         <input
           type="text"
           id="promise"
@@ -2197,33 +3811,39 @@ export default function OnboardingForm() {
           className="nes-input"
           placeholder="e.g. Code every day"
           required
-          maxLength={255}
+          maxLength={PROMISE_MAX_LENGTH}
+          aria-describedby="promise-hint"
+          onChange={(event) => setPromiseLength(event.target.value.length)}
         />
-      </div>
+      </Field>
 
-      <div className="nes-field">
-        <label htmlFor="visibility">Profile Visibility</label>
+      <Field id="visibility" label="Profile visibility">
         <div className="nes-select">
-          <select required id="visibility" name="visibility" defaultValue="public">
-            <option value="public">Public (Recommended)</option>
-            <option value="unlisted">Unlisted (Link only)</option>
+          <select
+            required
+            id="visibility"
+            name="visibility"
+            defaultValue="public"
+          >
+            <option value="public">Public (recommended)</option>
+            <option value="unlisted">Unlisted (link only)</option>
           </select>
         </div>
-      </div>
+      </Field>
 
       <input type="hidden" name="timezone" ref={timezoneRef} defaultValue="UTC" />
 
-      <button
-        type="submit"
-        className={`nes-btn is-primary w-full mt-4 ${pending ? 'is-disabled' : ''}`}
-        disabled={pending}
-      >
-        {pending ? 'Starting...' : 'Start Game'}
-      </button>
+      <PixelButton type="submit" variant="primary" full aria-busy={pending}>
+        {pending ? 'STARTING...' : 'START GAME'}
+      </PixelButton>
     </form>
   )
 }
 ```
+
+Селект видимости предлагает только `public` и `unlisted`. Значение `private` обрабатывается кодом и политиками, но в онбординге не выбирается — [product-spec.md §5](../../product-spec.md).
+
+Живой проверки занятости ника здесь **нет**, и это осознанно. Такая проверка требует чтения чужих строк `users`, что RLS запрещает по построению; корректная реализация — функция `SECURITY DEFINER` в Postgres с отдельным грантом, то есть новая миграция ради косметики. Занятый ник и так даёт внятное сообщение при отправке (задача 11 именно это и чинит).
 
 Таймзона проставляется в `useEffect`, а не инлайновым `<script>`: прежний вариант зависел от порядка выполнения скрипта и молча оставлял пустое значение, если форма отправлялась раньше.
 
@@ -2233,6 +3853,7 @@ export default function OnboardingForm() {
 
 ```tsx
 import { redirect } from 'next/navigation'
+import Panel from '@/components/ui/panel'
 import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
@@ -2254,11 +3875,10 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-[#212529]">
-      <div className="nes-container is-rounded bg-white max-w-lg w-full text-black">
-        <h2 className="title text-center mb-6 text-xl">Welcome, Player 1!</h2>
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <Panel title="WELCOME, PLAYER 1">
         <OnboardingForm />
-      </div>
+      </Panel>
     </main>
   )
 }
@@ -2291,10 +3911,19 @@ git commit -m "fix: surface onboarding errors and key the upsert on auth id"
 - Create: `src/app/[username]/not-found.tsx`
 
 **Interfaces:**
-- Consumes: `getPublicProfile` из `src/lib/dal/user.ts`; `getPublicPromiseView` из `src/lib/dal/promise.ts`
-- Produces: атрибуты `data-testid="current-streak"`, `data-testid="best-streak"` — те же, что на дашборде
+- Consumes: `getPublicProfile` из `src/lib/dal/user.ts`; `getPublicPromiseView` из `src/lib/dal/promise.ts`; `buildChain` из `src/lib/view/chain.ts`; `AppHeader`, `ShareBar`, `AvatarStage`, `StreakChain`, `StreakStats`, `Panel`, `pixelButtonClass` из `src/components/`
+- Produces: атрибуты `data-testid="current-streak"`, `data-testid="best-streak"`, `data-testid="chain"` — те же, что на дашборде
 
 **Контекст.** Чинятся дефекты 1.2, 1.3, 1.6 из [known-issues.md](../../known-issues.md). Копия `calculateStreak` удаляется вместе с UTC-расчётом; подмена фиктивными данными (`test` / `Read 10 pages`) убирается; `notFound()` выносится из `try`/`catch`.
+
+Появляется **панель шаринга**, которой не было вовсе — при том что расшаренная ссылка заявлена единственным каналом дистрибуции ([product-spec.md §1](../../product-spec.md)).
+
+Два отличия от дашборда, оба намеренные ([спека §4.3](../specs/2026-08-06-frontend-design.md)):
+
+- **кнопки чек-ина нет** — профиль чужой;
+- **остаток заморозок не показывается.** Замороженные дни в цепочке видны: это часть честной летописи. Остаток баланса — тактическая информация владельца, и `PublicPromiseView` его вообще не содержит.
+
+Шапка рендерится без `username`: посетитель не обязан быть авторизованным, поэтому меню аккаунта ему не показывается, а переключатель темы — да.
 
 Метаданные OG переезжают на файловую конвенцию `opengraph-image.tsx` в задаче 13, поэтому здесь блок `openGraph.images` не пишется вручную.
 
@@ -2304,17 +3933,21 @@ git commit -m "fix: surface onboarding errors and key the upsert on auth id"
 
 ```tsx
 import Link from 'next/link'
+import Panel from '@/components/ui/panel'
+import { pixelButtonClass } from '@/components/ui/pixel-button'
 
 export default function ProfileNotFound() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-[#212529]">
-      <div className="nes-container with-title is-centered max-w-lg w-full bg-white text-black">
-        <p className="title">404</p>
-        <p className="mb-8">No player found at this address.</p>
-        <Link href="/" className="nes-btn is-primary">
-          Start Your Own Quest
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <Panel
+        title="NO SUCH PLAYER"
+        className="flex flex-col items-center gap-6 text-center"
+      >
+        <p className="font-mono text-sm">No player found at this address.</p>
+        <Link href="/" className={pixelButtonClass('primary')}>
+          Start your own quest
         </Link>
-      </div>
+      </Panel>
     </main>
   )
 }
@@ -2326,12 +3959,28 @@ export default function ProfileNotFound() {
 
 ```tsx
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import AppHeader from '@/components/layout/app-header'
+import ShareBar from '@/components/share/share-bar'
+import AvatarStage from '@/components/streak/avatar-stage'
+import StreakChain from '@/components/streak/streak-chain'
+import StreakStats from '@/components/streak/streak-stats'
+import Panel from '@/components/ui/panel'
+import { pixelButtonClass } from '@/components/ui/pixel-button'
 import { getPublicProfile } from '@/lib/dal/user'
 import { getPublicPromiseView } from '@/lib/dal/promise'
+import { buildChain } from '@/lib/view/chain'
 
 interface PageProps {
   params: Promise<{ username: string }>
+}
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://never-give.app'
+
+function storedTheme(value: string | undefined): 'light' | 'dark' | null {
+  return value === 'light' || value === 'dark' ? value : null
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -2367,47 +4016,58 @@ export default async function PublicProfilePage({ params }: PageProps) {
   const promise = await getPublicPromiseView(profile)
   if (!promise) notFound()
 
+  const theme = storedTheme((await cookies()).get('theme')?.value)
+
+  const cells = buildChain({
+    today: promise.today,
+    checkinDates: promise.recentCheckins,
+    frozenDates: promise.recentFrozen,
+    startedOn: promise.startedOn,
+  })
+
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-[#212529] text-white">
-      <div className="max-w-3xl mx-auto">
-        <div className="nes-container is-rounded bg-white text-black mb-8 p-8 flex flex-col items-center">
-          <h1 className="text-3xl mb-2">{profile.username}</h1>
-          <p className="text-gray-500 mb-8">is committing to:</p>
-          <h2 className="text-2xl text-center font-bold mb-12">
-            &ldquo;{promise.title}&rdquo;
-          </h2>
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      {/* No username: the visitor is not necessarily signed in. */}
+      <AppHeader theme={theme} />
 
-          <div className="flex flex-col md:flex-row justify-around w-full items-center gap-8 mb-8">
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Current Streak</p>
-              <p className="text-6xl text-red-500" data-testid="current-streak">
-                {promise.currentStreak}
-              </p>
-            </div>
+      <Panel className="flex flex-col items-center gap-6">
+        <h1 className="min-w-0 truncate">{profile.username}</h1>
+        <p className="font-mono text-xs text-ink-muted">is committing to</p>
 
-            <div className="flex flex-col items-center">
-              <i
-                className={`nes-mario ${promise.currentStreak > 0 ? 'is-moving' : ''}`}
-                style={{ transform: 'scale(2.5)', margin: '2rem' }}
-              />
-              <p className="text-sm mt-4">Lvl {profile.avatarLevel}</p>
-            </div>
+        <p className="min-w-0 text-balance text-center [font-size:clamp(0.75rem,3.5vw,1.25rem)] [overflow-wrap:anywhere]">
+          {promise.title}
+        </p>
 
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Best Streak</p>
-              <p className="text-6xl" data-testid="best-streak">
-                {promise.bestStreak}
-              </p>
-            </div>
-          </div>
+        <AvatarStage currentStreak={promise.currentStreak} />
+
+        <div className="w-full">
+          <StreakStats
+            current={promise.currentStreak}
+            best={promise.bestStreak}
+          />
         </div>
 
-        <div className="text-center">
-          <a href="/" className="nes-btn is-primary">
-            Start Your Own Quest
-          </a>
+        <div className="w-full">
+          <StreakChain cells={cells} />
         </div>
-      </div>
+
+        {promise.startedOn ? (
+          <p className="font-mono text-xs text-ink-muted">
+            since {promise.startedOn}
+          </p>
+        ) : null}
+      </Panel>
+
+      <ShareBar
+        url={`${SITE_URL}/${profile.username}`}
+        title={`${profile.username} is committing to: ${promise.title}`}
+      />
+
+      <p className="text-center">
+        <Link href="/" className={pixelButtonClass('primary')}>
+          Start your own quest
+        </Link>
+      </p>
     </main>
   )
 }
@@ -2422,7 +4082,19 @@ Expected: без ошибок.
 
 Run: `npm run dev`
 
-Открыть `http://localhost:3000/<свой_username>` в приватном окне (без сессии). Ожидается: профиль виден, стрик совпадает с дашбордом. Открыть `http://localhost:3000/nosuchuser` — страница 404 из шага 1.
+Открыть `http://localhost:3000/<свой_username>` в приватном окне (без сессии).
+
+Ожидается:
+
+- профиль виден, стрик и цепочка совпадают с дашбордом;
+- счётчика заморозок нет;
+- `COPY LINK` кладёт в буфер полный URL профиля;
+- ссылки X и TG открываются с подставленным текстом обещания;
+- меню аккаунта отсутствует, переключатель темы работает.
+
+Открыть `http://localhost:3000/nosuchuser` — страница из шага 1.
+
+Проверить ширины 320, 375, 768, 1280: горизонтальной прокрутки нет, кнопки шаринга переносятся, а не выходят за край.
 
 - [ ] **Step 5: Коммит**
 
@@ -2442,12 +4114,16 @@ git commit -m "fix: rebuild public profile on the data access layer"
 - Modify: `package.json`
 
 **Interfaces:**
-- Consumes: `getPublicProfile` из `src/lib/dal/user.ts`; `getPublicPromiseView` из `src/lib/dal/promise.ts`
+- Consumes: `getPublicProfile` из `src/lib/dal/user.ts`; `getPublicPromiseView` из `src/lib/dal/promise.ts`; `buildChain`, `CHAIN_DAYS` из `src/lib/view/chain.ts`
 - Produces: OG-картинка 1200×630 по маршруту, который Next подставляет в метаданные автоматически
 
 **Контекст.** Чинятся дефекты 1.10 и 1.11 из [known-issues.md](../../known-issues.md). Расшариваемая картинка — главный канал распространения продукта, а сейчас она рисуется системным моноширинным шрифтом.
 
 Переход на файловую конвенцию `opengraph-image.tsx` вместо ручного роута `/api/og` даёт автоматическую простановку `og:image`, `og:image:width` и `og:image:height` — руками их поддерживать больше не нужно.
+
+**В картинку идёт цепочка.** Это то же самое `buildChain`, что и на странице: расшаренная ссылка должна показывать доказательство, а не только цифру. Ради этого `PublicPromiseView` и отдаёт даты (задача 9).
+
+Здесь единственное разрешённое исключение из запрета на литеральные цвета: Satori рендерит картинку вне документа и до CSS-переменных приложения не дотягивается, поэтому палитра в этом файле записана значениями светлой темы напрямую. Satori умеет только flexbox — grid из `.chain` тут неприменим, клетки выкладываются строкой.
 
 - [ ] **Step 1: Скачать шрифт**
 
@@ -2484,6 +4160,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getPublicProfile } from '@/lib/dal/user'
 import { getPublicPromiseView } from '@/lib/dal/promise'
+import { buildChain, type Cell } from '@/lib/view/chain'
 
 export const alt = 'never-give.app streak'
 export const size = { width: 1200, height: 630 }
@@ -2492,6 +4169,19 @@ export const contentType = 'image/png'
 const pressStart2P = await readFile(
   join(process.cwd(), 'assets/PressStart2P-Regular.ttf'),
 )
+
+// Satori renders outside the document and cannot see the app's CSS variables,
+// so the light-theme palette is written out here.
+const INK = '#1a1d21'
+const MUTED = '#5b6169'
+const PANEL = '#ffffff'
+const BG = '#14171a'
+const CELL_COLOR: Record<Cell['state'], string> = {
+  checked: '#b3341c',
+  frozen: '#1c5f8f',
+  missed: '#b9bec4',
+  empty: '#dfe1e4',
+}
 
 export default async function Image({
   params,
@@ -2507,6 +4197,15 @@ export default async function Image({
   const title = promise?.title ?? 'A new quest'
   const streak = promise?.currentStreak ?? 0
 
+  const cells: Cell[] = promise
+    ? buildChain({
+        today: promise.today,
+        checkinDates: promise.recentCheckins,
+        frozenDates: promise.recentFrozen,
+        startedOn: promise.startedOn,
+      })
+    : []
+
   return new ImageResponse(
     (
       <div
@@ -2514,10 +4213,7 @@ export default async function Image({
           height: '100%',
           width: '100%',
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#212529',
+          backgroundColor: BG,
           padding: 40,
         }}
       >
@@ -2527,30 +4223,43 @@ export default async function Image({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'white',
-            border: '8px solid black',
-            boxShadow: '16px 16px 0px 0px rgba(0,0,0,1)',
+            backgroundColor: PANEL,
+            border: `8px solid ${INK}`,
             width: '100%',
             height: '100%',
             padding: 60,
           }}
         >
-          <div style={{ fontSize: 36, color: '#000' }}>{displayName}</div>
-          <div style={{ fontSize: 20, color: '#666', marginTop: 24 }}>
+          <div style={{ fontSize: 36, color: INK }}>{displayName}</div>
+          <div style={{ fontSize: 18, color: MUTED, marginTop: 24 }}>
             is committing to
           </div>
           <div
             style={{
-              fontSize: 40,
-              color: '#000',
-              marginTop: 32,
+              fontSize: 34,
+              color: INK,
+              marginTop: 28,
               textAlign: 'center',
               // Satori has no line clamping, so keep long titles from
               // pushing the streak out of frame.
-              maxWidth: 900,
+              maxWidth: 940,
             }}
           >
             {title.length > 48 ? `${title.slice(0, 45)}...` : title}
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 44 }}>
+            {cells.map((cell) => (
+              <div
+                key={cell.date}
+                style={{
+                  width: 26,
+                  height: 26,
+                  backgroundColor: CELL_COLOR[cell.state],
+                  border: `3px solid ${INK}`,
+                }}
+              />
+            ))}
           </div>
 
           <div
@@ -2558,11 +4267,11 @@ export default async function Image({
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              marginTop: 56,
+              marginTop: 44,
             }}
           >
-            <span style={{ fontSize: 18, color: '#666' }}>CURRENT STREAK</span>
-            <span style={{ fontSize: 96, color: '#e52521', marginTop: 16 }}>
+            <span style={{ fontSize: 16, color: MUTED }}>CURRENT STREAK</span>
+            <span style={{ fontSize: 88, color: CELL_COLOR.checked, marginTop: 16 }}>
               {streak}
             </span>
           </div>
@@ -2608,17 +4317,484 @@ git commit -m "feat: render OG image with the pixel font via next/og"
 
 ---
 
+### Task 13a: Лендинг и экран входа
+
+**Files:**
+- Rewrite: `src/app/page.tsx`
+- Rewrite: `src/app/login/page.tsx`
+- Create: `src/app/login/login-form.tsx`
+
+**Interfaces:**
+- Consumes: `login`, `signup` из `src/app/login/actions.ts` (файл **не меняется**); `createClient` из `src/utils/supabase/server.ts`; `buildChain` из `src/lib/view/chain.ts`; `datesBetween` из `src/lib/dates.ts`; `AppHeader`, `StreakChain`, `Panel`, `PixelButton`, `pixelButtonClass` из `src/components/`
+- Produces: `LoginForm()` — default export `src/app/login/login-form.tsx`
+
+**Контекст.** Лендинг — точка приземления по расшаренной ссылке, то есть место, где посетитель решает, регистрироваться ли. Сейчас это три кнопки входа без единого слова о механике.
+
+Заморозки выносятся в отдельный блок сознательно: это единственная механика, отличающая продукт от соседних трекеров, и объяснять её надо до регистрации, а не после.
+
+Демо-цепочка строится тем же `buildChain` с зафиксированными датами. Системные часы не читаются, поэтому картинка детерминированная и страница остаётся статической.
+
+Кнопка Google перестаёт быть `is-error`. Красный в дизайн-системе означает ошибку, и «Sign in with Google» красной кнопкой читается как предупреждение.
+
+`src/app/login/actions.ts` остаётся как есть: логика входа рабочая, меняется только оболочка. `useActionState` получает клиентскую обёртку, которая вызывает уже существующие server actions — переписывать их сигнатуры незачем.
+
+- [ ] **Step 1: Переписать лендинг**
+
+Заменить содержимое `src/app/page.tsx`:
+
+```tsx
+import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import AppHeader from '@/components/layout/app-header'
+import StreakChain from '@/components/streak/streak-chain'
+import Panel from '@/components/ui/panel'
+import { pixelButtonClass } from '@/components/ui/pixel-button'
+import { datesBetween } from '@/lib/dates'
+import { buildChain } from '@/lib/view/chain'
+import { createClient } from '@/utils/supabase/server'
+
+// Fixed dates keep the demo deterministic: no system clock, no hydration drift.
+const DEMO_TODAY = '2026-08-10'
+const DEMO_START = '2026-07-16'
+const DEMO_FROZEN = '2026-08-02'
+const DEMO_MISSED = '2026-07-28'
+
+const DEMO_CHAIN = buildChain({
+  today: DEMO_TODAY,
+  checkinDates: datesBetween(DEMO_START, DEMO_TODAY).filter(
+    (date) => date !== DEMO_FROZEN && date !== DEMO_MISSED,
+  ),
+  frozenDates: [DEMO_FROZEN],
+  startedOn: DEMO_START,
+})
+
+const FREEZE_DEMO = buildChain({
+  today: '2026-08-10',
+  checkinDates: datesBetween('2026-08-01', '2026-08-10').filter(
+    (date) => date !== '2026-08-06',
+  ),
+  frozenDates: ['2026-08-06'],
+  startedOn: '2026-08-01',
+  days: 10,
+})
+
+const STEPS = [
+  {
+    title: '1. PROMISE',
+    body: 'Say out loud what you will do every single day. One promise, in public.',
+  },
+  {
+    title: '2. CHECK IN',
+    body: 'Tap the button once a day. Your day ends at midnight in your own timezone.',
+  },
+  {
+    title: '3. DO NOT BREAK IT',
+    body: 'Every check-in adds a link. Your profile shows the whole chain to anyone.',
+  },
+]
+
+function storedTheme(value: string | undefined): 'light' | 'dark' | null {
+  return value === 'light' || value === 'dark' ? value : null
+}
+
+export default async function Home() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Outside any try/catch: redirect() throws a control-flow exception.
+  if (user) redirect('/dashboard')
+
+  const theme = storedTheme((await cookies()).get('theme')?.value)
+
+  return (
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-8 p-4 sm:p-8">
+      <AppHeader theme={theme} />
+
+      <Panel className="flex flex-col items-center gap-6 text-center">
+        <h1 className="[font-size:clamp(1rem,5vw,1.75rem)]">never-give.app</h1>
+        <p className="font-mono text-sm text-ink-muted">
+          Promise publicly. Check in daily. Do not break the chain.
+        </p>
+
+        <div className="flex w-full flex-col gap-3">
+          <form action="/auth/signin" method="post">
+            <input type="hidden" name="provider" value="google" />
+            <button type="submit" className={pixelButtonClass('default', true)}>
+              Sign in with Google
+            </button>
+          </form>
+
+          <form action="/auth/signin" method="post">
+            <input type="hidden" name="provider" value="github" />
+            <button type="submit" className={pixelButtonClass('default', true)}>
+              Sign in with GitHub
+            </button>
+          </form>
+
+          <Link href="/login" className={pixelButtonClass('primary', true)}>
+            Continue with email
+          </Link>
+        </div>
+      </Panel>
+
+      <Panel title="HOW IT WORKS" className="flex flex-col gap-6">
+        {STEPS.map((step) => (
+          <div key={step.title} className="min-w-0">
+            <h2 className="text-sm">{step.title}</h2>
+            <p className="mt-2 font-mono text-xs text-ink-muted">{step.body}</p>
+          </div>
+        ))}
+      </Panel>
+
+      <Panel title="FREEZES" className="flex flex-col gap-4">
+        <p className="font-mono text-xs text-ink-muted">
+          Miss a day and a freeze covers it automatically. You earn one every
+          seven days, and you can hold three.
+        </p>
+
+        <StreakChain cells={FREEZE_DEMO} />
+
+        <p className="font-mono text-xs text-ink-muted">
+          All or nothing: if your freezes cannot cover the whole gap, none are
+          spent. A partly rescued chain would break anyway, so they are kept for
+          next time.
+        </p>
+      </Panel>
+
+      <Panel title="A REAL CHAIN" className="flex flex-col gap-4">
+        <StreakChain cells={DEMO_CHAIN} />
+        <p className="font-mono text-xs text-ink-muted">
+          This is what your public profile shows. One missed day, one saved by a
+          freeze, the rest earned.
+        </p>
+      </Panel>
+
+      <footer className="text-center font-mono text-xs text-ink-muted">
+        never-give.app
+      </footer>
+    </main>
+  )
+}
+```
+
+- [ ] **Step 2: Написать клиентскую форму входа**
+
+Создать `src/app/login/login-form.tsx`:
+
+```tsx
+'use client'
+
+import Link from 'next/link'
+import { useActionState, useState } from 'react'
+import Field from '@/components/ui/field'
+import PixelButton from '@/components/ui/pixel-button'
+import { login, signup } from './actions'
+
+type LoginState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  | { status: 'check_email' }
+
+const INITIAL_STATE: LoginState = { status: 'idle' }
+
+export default function LoginForm() {
+  const [isLogin, setIsLogin] = useState(true)
+
+  // The wrapper runs on the client and calls the existing server actions, so
+  // their signatures stay untouched.
+  const [state, action, pending] = useActionState(
+    async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
+      if (isLogin) {
+        const result = await login(formData)
+        return result?.error
+          ? { status: 'error', message: result.error }
+          : { status: 'idle' }
+      }
+
+      const result = await signup(formData)
+      if (result?.error) return { status: 'error', message: result.error }
+      return { status: 'check_email' }
+    },
+    INITIAL_STATE,
+  )
+
+  if (state.status === 'check_email') {
+    return (
+      <div className="flex flex-col items-center gap-6 text-center">
+        <p role="status">REGISTRATION SUCCESSFUL</p>
+        <p className="font-mono text-xs text-ink-muted">
+          Check your email to verify the account before signing in.
+        </p>
+        <Link href="/" className="font-mono text-xs underline">
+          Back to home
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <form action={action} className="flex flex-col gap-6">
+      {state.status === 'error' ? (
+        <p role="alert" className="font-mono text-xs text-streak">
+          {state.message}
+        </p>
+      ) : null}
+
+      <Field id="email" label="Email">
+        <input
+          type="email"
+          id="email"
+          name="email"
+          className="nes-input"
+          autoComplete="email"
+          required
+        />
+      </Field>
+
+      <Field
+        id="password"
+        label="Password"
+        hint={isLogin ? undefined : 'At least 6 characters.'}
+      >
+        <input
+          type="password"
+          id="password"
+          name="password"
+          className="nes-input"
+          autoComplete={isLogin ? 'current-password' : 'new-password'}
+          aria-describedby={isLogin ? undefined : 'password-hint'}
+          required
+        />
+      </Field>
+
+      <PixelButton type="submit" variant="primary" full aria-busy={pending}>
+        {pending ? 'PLEASE WAIT...' : isLogin ? 'SIGN IN' : 'SIGN UP'}
+      </PixelButton>
+
+      <button
+        type="button"
+        className="font-mono text-xs underline"
+        onClick={() => setIsLogin((value) => !value)}
+      >
+        {isLogin
+          ? 'No account yet? Sign up'
+          : 'Already have an account? Sign in'}
+      </button>
+
+      <Link href="/" className="text-center font-mono text-xs underline">
+        Back to home
+      </Link>
+    </form>
+  )
+}
+```
+
+- [ ] **Step 3: Переписать страницу входа**
+
+Заменить содержимое `src/app/login/page.tsx`:
+
+```tsx
+import { cookies } from 'next/headers'
+import AppHeader from '@/components/layout/app-header'
+import Panel from '@/components/ui/panel'
+import LoginForm from './login-form'
+
+function storedTheme(value: string | undefined): 'light' | 'dark' | null {
+  return value === 'light' || value === 'dark' ? value : null
+}
+
+export default async function LoginPage() {
+  const theme = storedTheme((await cookies()).get('theme')?.value)
+
+  return (
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <AppHeader theme={theme} />
+      <Panel title="SIGN IN">
+        <LoginForm />
+      </Panel>
+    </main>
+  )
+}
+```
+
+Страница стала серверной, вся интерактивность ушла в `login-form.tsx`. Прежний `'use client'` на всей странице тянул в браузер и разметку, которой там делать нечего.
+
+- [ ] **Step 4: Проверить компиляцию**
+
+Run: `npx tsc --noEmit && npm run lint`
+Expected: без ошибок.
+
+- [ ] **Step 5: Проверить вручную**
+
+Run: `npm run dev`
+
+Открыть `http://localhost:3000/` без сессии. Ожидается: лендинг с четырьмя панелями, обе демо-цепочки отрисованы, кнопки входа нейтральные (красной среди них нет).
+
+Открыть `http://localhost:3000/login`. Ожидается: переключение sign in / sign up работает, неверный пароль показывает сообщение под заголовком, регистрация показывает экран `REGISTRATION SUCCESSFUL`.
+
+Проверить ширины 320, 375, 768, 1280 на обеих страницах: горизонтальной прокрутки нет.
+
+- [ ] **Step 6: Коммит**
+
+```bash
+git add src/app/page.tsx src/app/login/
+git commit -m "feat: rebuild the landing page and sign-in screen"
+```
+
+---
+
+### Task 13b: Служебные состояния
+
+**Files:**
+- Create: `src/app/dashboard/loading.tsx`
+- Create: `src/app/[username]/loading.tsx`
+- Create: `src/app/not-found.tsx`
+
+**Interfaces:**
+- Consumes: `Panel` из `src/components/ui/panel.tsx`; `pixelButtonClass` из `src/components/ui/pixel-button.tsx`
+- Produces: ничего, что потребляют другие задачи
+
+**Контекст.** Сейчас в приложении нет ни одного из этих файлов, хотя [architecture.md §3](../../architecture.md) их описывает. Дашборд и профиль ходят в БД на каждый запрос, поэтому пауза перед первой отрисовкой заметна, и показывать в ней пустой экран незачем.
+
+Пустые состояния дашборда (первый день, сгоревшая цепочка) уже реализованы в задаче 10 — здесь только скелеты и глобальная 404.
+
+Пульсация скелетона гасится глобальным правилом `prefers-reduced-motion` из `nes-theme.css` (задача 9a), отдельной обработки не требует.
+
+- [ ] **Step 1: Написать скелет дашборда**
+
+Создать `src/app/dashboard/loading.tsx`:
+
+```tsx
+import Panel from '@/components/ui/panel'
+
+function Block({ className }: { className: string }) {
+  return <div className={`animate-pulse bg-empty ${className}`} />
+}
+
+export default function DashboardLoading() {
+  return (
+    <main
+      aria-busy="true"
+      aria-label="Loading your quest"
+      className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8"
+    >
+      <Block className="h-11 w-full" />
+
+      <Panel title="ACTIVE QUEST" className="flex flex-col items-center gap-6">
+        <Block className="h-6 w-3/4" />
+        <Block className="h-16 w-14 sm:h-24 sm:w-[5.25rem]" />
+        <div className="grid w-full grid-cols-2 gap-4">
+          <Block className="h-16 w-full" />
+          <Block className="h-16 w-full" />
+        </div>
+        <Block className="h-11 w-full" />
+        <Block className="h-4 w-full" />
+      </Panel>
+    </main>
+  )
+}
+```
+
+- [ ] **Step 2: Написать скелет профиля**
+
+Создать `src/app/[username]/loading.tsx`:
+
+```tsx
+import Panel from '@/components/ui/panel'
+
+function Block({ className }: { className: string }) {
+  return <div className={`animate-pulse bg-empty ${className}`} />
+}
+
+export default function ProfileLoading() {
+  return (
+    <main
+      aria-busy="true"
+      aria-label="Loading profile"
+      className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8"
+    >
+      <Block className="h-11 w-full" />
+
+      <Panel className="flex flex-col items-center gap-6">
+        <Block className="h-6 w-40" />
+        <Block className="h-6 w-3/4" />
+        <Block className="h-16 w-14 sm:h-24 sm:w-[5.25rem]" />
+        <div className="grid w-full grid-cols-2 gap-4">
+          <Block className="h-16 w-full" />
+          <Block className="h-16 w-full" />
+        </div>
+        <Block className="h-4 w-full" />
+      </Panel>
+    </main>
+  )
+}
+```
+
+- [ ] **Step 3: Написать глобальную 404**
+
+Создать `src/app/not-found.tsx`:
+
+```tsx
+import Link from 'next/link'
+import Panel from '@/components/ui/panel'
+import { pixelButtonClass } from '@/components/ui/pixel-button'
+
+export default function NotFound() {
+  return (
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      <Panel
+        title="404"
+        className="flex flex-col items-center gap-6 text-center"
+      >
+        <p className="font-mono text-sm">There is nothing at this address.</p>
+        <Link href="/" className={pixelButtonClass('primary')}>
+          Back to home
+        </Link>
+      </Panel>
+    </main>
+  )
+}
+```
+
+- [ ] **Step 4: Проверить компиляцию и сборку**
+
+Run: `npx tsc --noEmit && npm run lint && npm run build`
+Expected: без ошибок.
+
+- [ ] **Step 5: Проверить вручную**
+
+Run: `npm run dev`
+
+Открыть `http://localhost:3000/dashboard` и `http://localhost:3000/<свой_username>`. При медленном соединении (DevTools → Network → Slow 3G) ожидается скелет вместо пустого экрана.
+
+Открыть `http://localhost:3000/no/such/path` — глобальная 404. Открыть `http://localhost:3000/nosuchuser` — по-прежнему `NO SUCH PLAYER` из задачи 12, а не глобальная.
+
+Включить в системе «уменьшить движение» и убедиться, что скелет не пульсирует.
+
+- [ ] **Step 6: Коммит**
+
+```bash
+git add src/app/dashboard/loading.tsx "src/app/[username]/loading.tsx" src/app/not-found.tsx
+git commit -m "feat: add loading skeletons and a global not-found page"
+```
+
+---
+
 ### Task 14: E2E-тесты
 
 **Files:**
 - Create: `playwright.config.ts`
 - Create: `e2e/fixtures.ts`
 - Create: `e2e/streak.spec.ts`
+- Create: `e2e/layout.spec.ts`
 - Modify: `package.json`
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Consumes: `data-testid="current-streak"`, `data-testid="best-streak"` из задач 10 и 12
+- Consumes: `data-testid="current-streak"`, `data-testid="best-streak"`, `data-testid="chain"`, `data-responsive` из задач 9b, 10 и 12
 - Produces: npm-скрипт `test:e2e`
 
 **Контекст.** Юнит-тесты покрывают чистую логику, но не проверяют, что страницы, RLS-политики и server actions работают вместе. Документация Next.js прямо рекомендует покрывать async Server Components именно E2E-тестами.
@@ -2819,16 +4995,92 @@ test('an unknown profile returns the 404 page', async ({ page }) => {
 })
 ```
 
-- [ ] **Step 7: Запустить E2E**
+- [ ] **Step 7: Написать проверки раскладки**
+
+Эти тесты не требуют сессии и потому не трогают фикстуру: они ходят по публичным роутам.
+
+Создать `e2e/layout.spec.ts`:
+
+```ts
+import { expect, test } from '@playwright/test'
+
+const WIDTHS = [320, 375, 768, 1280]
+const PUBLIC_PATHS = ['/', '/login']
+
+// A page that scrolls sideways is broken on a phone, and it is the failure
+// mode a monospaced pixel font produces most easily.
+for (const width of WIDTHS) {
+  for (const path of PUBLIC_PATHS) {
+    test(`${path} does not scroll horizontally at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto(path)
+
+      const overflow = await page.evaluate(() => {
+        const root = document.documentElement
+        return root.scrollWidth - root.clientWidth
+      })
+
+      expect(overflow).toBeLessThanOrEqual(0)
+    })
+  }
+}
+
+test('a full chain trims to 14 days on a narrow screen', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+
+  const cells = page.locator('[data-testid="chain"][data-responsive]').locator('li')
+
+  // All thirty are rendered; sixteen are hidden by CSS below `sm`.
+  await expect(cells).toHaveCount(30)
+  await expect(cells.first()).toBeHidden()
+  await expect(cells.nth(16)).toBeVisible()
+})
+
+test('a short chain is never trimmed', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+
+  const shortChain = page
+    .locator('[data-testid="chain"]:not([data-responsive])')
+    .first()
+
+  await expect(shortChain.locator('li').first()).toBeVisible()
+})
+
+test('the theme choice survives a reload', async ({ page }) => {
+  await page.goto('/')
+
+  // With no cookie the media query decides, and the attribute is absent.
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.*/)
+
+  await page
+    .getByRole('button', { name: /Switch to (dark|light) theme/ })
+    .click()
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', /light|dark/)
+
+  const chosen = await page.evaluate(() =>
+    document.documentElement.getAttribute('data-theme'),
+  )
+
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', chosen ?? '')
+})
+```
+
+- [ ] **Step 8: Запустить E2E**
 
 Run: `npm run test:e2e`
-Expected: PASS — 3 теста. Первый запуск дольше остальных: Playwright собирает продовый билд.
+Expected: PASS — 14 тестов (3 сценарных плюс 11 проверок раскладки). Первый запуск дольше остальных: Playwright собирает продовый билд.
 
-- [ ] **Step 8: Коммит**
+- [ ] **Step 9: Коммит**
 
 ```bash
 git add playwright.config.ts e2e/ package.json package-lock.json .gitignore
-git commit -m "test: add Playwright end-to-end coverage for the streak flow"
+git commit -m "test: add Playwright coverage for the streak flow and layout"
 ```
 
 ---
@@ -2925,14 +5177,36 @@ Expected: `0`. Если в базе нет приватных обещаний, 
 | 1.11 | `**Устранено** (задача 13): шрифт Press Start 2P загружается в `ImageResponse`.` |
 | 1.12 | `**Устранено** (задачи 1–4, 14): Vitest на чистую логику, Playwright на сквозные сценарии.` |
 | 1.13 | `**Устранено**: README переписан.` |
+| 1.14 | `**Устранено** (задачи 9b, 10, 12): подпись `Lvl` убрана, стадия аватара выводится из длины стрика.` |
+| 1.15 | `**Снято** (задача 11): расхождения нет. Селект предлагает `public` и `unlisted`, `private` обрабатывается кодом и политиками — это зафиксировано в product-spec §5 как решение, а не недосмотр.` |
 
-Пункты 1.14 (`avatar_level` не растёт) и 1.15 (`private` не выбирается в онбординге) **не** трогать: они остаются как есть и уже описаны в части 2 как осознанные решения.
+Пункт 2.7 части 2 («`avatar_level` остаётся в выдаче как константа») удалить: он противоречит устранённому 1.14.
 
-- [ ] **Step 4: Проверить, что документация не разошлась с кодом**
+- [ ] **Step 4: Проверить адаптив и доступность**
+
+Чек-лист из [фронтенд-спеки](../specs/2026-08-06-frontend-design.md) §5.5, §7. Пройти по `/`, `/login`, `/onboarding`, `/dashboard`, `/<username>`:
+
+| Проверка | Как |
+|---|---|
+| Нет горизонтальной прокрутки на 320/375/768/1280 | закрыто E2E из задачи 14, здесь — глазами |
+| Кнопки не мельче 44px | DevTools, режим инспектора |
+| Фокус виден на каждом интерактивном элементе | пройти всю страницу клавишей Tab |
+| Цепочка озвучивается одной строкой | скринридер или Accessibility-панель DevTools |
+| Кнопки `disabled` без объяснения нет ни одной | `grep -rn "disabled" src/app src/components` |
+| Анимации гаснут при «уменьшить движение» | системная настройка либо эмуляция в DevTools |
+| Литеральных цветов не осталось | `grep -rnE "#[0-9a-fA-F]{6}|text-(gray|red|blue)-[0-9]" src/app src/components` |
+
+Последняя команда должна давать совпадения только в `src/app/globals.css`, `src/app/nes-theme.css` и `src/app/[username]/opengraph-image.tsx` — там литералы разрешены явно (задачи 9a и 13).
+
+Аналогично `grep -rnE "nes-(container|btn)" src/app --include=*.tsx` не должен находить ничего: контейнеры и кнопки в роутах берутся из примитивов. `nes-input` и `nes-select` на полях ввода разрешены.
+
+- [ ] **Step 5: Проверить, что документация не разошлась с кодом**
 
 Пройти по чек-листу [docs/product-spec.md §7](../../product-spec.md) и отметить выполненные пункты. Любой невыполненный пункт — либо недоделанная задача, либо ошибка в спецификации; разобраться до коммита.
 
-- [ ] **Step 5: Коммит**
+Сверить с кодом и [фронтенд-спеку](../specs/2026-08-06-frontend-design.md): если реализация от неё отошла, правится тот документ, который неправ, а не замалчивается расхождение.
+
+- [ ] **Step 6: Коммит**
 
 ```bash
 git add docs/
@@ -2950,10 +5224,27 @@ git commit -m "docs: mark MVP defects as resolved"
 | Заморозки за длину стрика, каждые 7 дней, потолок 3 | 3, 9 |
 | Ленивое автоматическое списание | 3, 9, 10 |
 | RLS через переключение роли в Drizzle | 6, 7, 9 |
-| Vitest + Playwright | 1–4, 14 |
+| Vitest + Playwright | 1–4a, 14 |
 | Хостинг Vercel, без cron | архитектурная документация, §10 |
 | Зарезервированные поля остаются в схеме | 5, документация |
 
-**Покрытие дефектов из known-issues.md:** 1.1 → 10 · 1.2 → 1, 2 · 1.3 → 2, 10, 12 · 1.4 → 11 · 1.5 → 6, 11 · 1.6 → 10, 12 · 1.7 → 5 · 1.8 → 6, 7 · 1.9 → 3, 5, 9 · 1.10 → 13 · 1.11 → 13 · 1.12 → 1–4, 14 · 1.13 → выполнено при подготовке документации. Пункты 1.14 и 1.15 намеренно оставлены, зафиксированы в части 2.
+**Покрытие фронтенд-спеки** ([2026-08-06-frontend-design.md](../specs/2026-08-06-frontend-design.md)):
+
+| Раздел спеки | Задачи |
+|---|---|
+| §2 Слои стилей, токены, темы, шрифты | 9a |
+| §3 Компоненты и чистый слой представления | 4a, 9b |
+| §4.2 Дашборд | 10 |
+| §4.3 Публичный профиль | 12 |
+| §4.4 Лендинг | 13a |
+| §4.5 Логин и онбординг | 11, 13a |
+| §4.6 Служебные и пустые состояния | 10, 12, 13b |
+| §5 Адаптивность | 9a, 9b, 10, 12 |
+| §6 Поведение чек-ина | 9, 10 |
+| §7 Доступность | 9a, 9b, 10, 15 |
+| §8 Проверки | 4a, 14 |
+| §9 Вливание в план | этот документ |
+
+**Покрытие дефектов из known-issues.md:** 1.1 → 10 · 1.2 → 1, 2 · 1.3 → 2, 10, 12 · 1.4 → 11 · 1.5 → 6, 11 · 1.6 → 10, 12 · 1.7 → 5 · 1.8 → 6, 7 · 1.9 → 3, 5, 9 · 1.10 → 13 · 1.11 → 13 · 1.12 → 1–4a, 14 · 1.13 → выполнено при подготовке документации · 1.14 → 9b, 10, 12 (подпись `Lvl` убрана, стадия аватара выводится из стрика) · 1.15 → 11 (расхождения нет: `private` не предлагается сознательно, product-spec §5).
 
 **Согласованность имён между задачами:** `LocalDate`, `localDateOf`, `addDays`, `datesBetween`, `daysBetween` (задача 1) · `calculateStreak`, `coveredDays`, `planFreezes`, `earnedFreezeBalance`, `FREEZE_EARN_INTERVAL`, `MAX_FREEZE_BALANCE` (задачи 2, 3) · `validateUsername` (задача 4) · `streak_freezes` (задача 5) · `withUser`, `withAnon`, `DbTransaction` (задача 7) · `getSessionUser`, `requireSessionUser`, `getProfile`, `getPublicProfile`, `Profile`, `PublicProfile` (задача 8) · `getOwnPromiseView`, `getPublicPromiseView`, `checkIn`, `createProfileAndPromise` (задачи 9, 11) · `data-testid="current-streak"`, `data-testid="best-streak"` (задачи 10, 12, 14).
