@@ -892,7 +892,7 @@ export function validatePromiseTitle(title: string): PromiseTitleError | null {
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
 Run: `npm test`
-Expected: PASS — 48 тестов.
+Expected: PASS — 49 тестов (48 из этой задачи плюс регрессионный тест на «заморозка одна продлевает стрик», добавленный в задаче 3).
 
 - [ ] **Step 5: Коммит**
 
@@ -1230,7 +1230,7 @@ export function daysToNextStage(currentStreak: number): number | null {
 - [ ] **Step 8: Убедиться, что все тесты проходят**
 
 Run: `npm test`
-Expected: PASS — 73 теста.
+Expected: PASS — 74 теста.
 
 - [ ] **Step 9: Коммит**
 
