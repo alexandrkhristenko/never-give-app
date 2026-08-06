@@ -1,3 +1,9 @@
+// Row level security, every policy on these tables, and the
+// users.id -> auth.users.id foreign key are owned by the hand-written
+// migrations in drizzle/0001_rls_policies.sql and
+// drizzle/0002_harden_rls_policies.sql. Do not declare RLS, policies, or that
+// foreign key here: `db:generate` would emit duplicate `CREATE POLICY`
+// statements for them and `db:migrate` would fail applying it.
 import {
   pgTable,
   uuid,
