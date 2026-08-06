@@ -1,4 +1,4 @@
-import { addDays, type LocalDate } from './dates'
+import { addDays, datesBetween, type LocalDate } from './dates'
 
 export interface StreakInput {
   /** Dates the user actually checked in on. */
@@ -63,4 +63,68 @@ export function calculateStreak({
   }
 
   return { current, best }
+}
+
+/** Days of unbroken streak needed to earn one freeze. */
+export const FREEZE_EARN_INTERVAL = 7
+
+/** Hard cap on how many freezes a user may hold. */
+export const MAX_FREEZE_BALANCE = 3
+
+export interface FreezePlanInput extends StreakInput {
+  freezeBalance: number
+}
+
+export interface FreezePlan {
+  /** Days to record a freeze for. Empty when nothing is spent. */
+  datesToFreeze: LocalDate[]
+  streakSurvives: boolean
+}
+
+/**
+ * Decides which missed days a freeze should cover.
+ * Pure: it plans, the caller writes.
+ */
+export function planFreezes({
+  checkinDates,
+  frozenDates,
+  today,
+  freezeBalance,
+}: FreezePlanInput): FreezePlan {
+  const ascending = coveredDays(checkinDates, frozenDates)
+  if (ascending.length === 0) {
+    return { datesToFreeze: [], streakSurvives: false }
+  }
+
+  const lastCovered = ascending[ascending.length - 1]
+
+  // Today is not a miss until it is over, so the gap can only end at yesterday.
+  const gap = datesBetween(addDays(lastCovered, 1), addDays(today, -1))
+  if (gap.length === 0) {
+    return { datesToFreeze: [], streakSurvives: true }
+  }
+
+  // All or nothing: covering part of a gap still breaks the streak, so the
+  // freezes are better kept for a gap that can actually be closed.
+  if (gap.length > freezeBalance) {
+    return { datesToFreeze: [], streakSurvives: false }
+  }
+
+  return { datesToFreeze: gap, streakSurvives: true }
+}
+
+/**
+ * The freeze balance after a check-in that extended the streak to
+ * `streakLength`. Returns `currentBalance` unchanged when nothing is earned.
+ */
+export function earnedFreezeBalance(
+  streakLength: number,
+  currentBalance: number,
+): number {
+  const earnsFreeze =
+    streakLength > 0 && streakLength % FREEZE_EARN_INTERVAL === 0
+
+  if (!earnsFreeze) return currentBalance
+
+  return Math.min(currentBalance + 1, MAX_FREEZE_BALANCE)
 }
