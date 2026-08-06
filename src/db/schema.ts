@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, integer, boolean, text, date, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer, boolean, text, date, primaryKey, unique } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const users = pgTable('users', {
@@ -33,7 +33,7 @@ export const checkins = pgTable('checkins', {
   created_at: timestamp('created_at').defaultNow().notNull(),
 }, (table) => {
   return {
-    pk: primaryKey({ columns: [table.promise_id, table.local_date] }), // Prevent double check-ins
+    uq: unique('checkin_promise_date_unique').on(table.promise_id, table.local_date), // Prevent double check-ins
   };
 });
 
