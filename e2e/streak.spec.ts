@@ -33,7 +33,11 @@ test('a new player onboards, checks in, and shows up publicly', async ({
   // Not a disabled button: once there is nothing to do the form renders a
   // status element instead, so that a keyboard user is not handed a control
   // that cannot be focused and explains nothing.
-  await expect(page.getByRole('status')).toContainText('DONE FOR TODAY')
+  // Scoped by text: an earning check-in renders a second `role="status"` for
+  // "+1 FREEZE", so an unscoped locator would become a strict-mode failure.
+  await expect(
+    page.getByRole('status').filter({ hasText: 'DONE FOR TODAY' }),
+  ).toBeVisible()
 
   // The design spec wants the horizontal-overflow check on the dashboard and
   // the public profile as well as the landing page. Those two need a session
@@ -57,7 +61,7 @@ test('a new player onboards, checks in, and shows up publicly', async ({
   // The public page must show the same streak to a visitor with no session.
   const visitor = await page.context().browser()!.newContext()
   const visitorPage = await visitor.newPage()
-  await visitorPage.goto(`http://localhost:3000/${user.username}`)
+  await visitorPage.goto(`/${user.username}`)
 
   await expect(
     visitorPage.getByRole('heading', { name: user.username }),
@@ -77,7 +81,7 @@ test('a new player onboards, checks in, and shows up publicly', async ({
   await visitor.close()
 })
 
-test('a taken username is reported instead of failing silently', async ({
+test('a reserved username is reported instead of failing silently', async ({
   page,
   user,
 }) => {
