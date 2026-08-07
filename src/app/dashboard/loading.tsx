@@ -13,15 +13,23 @@ export default function DashboardLoading() {
     >
       <Block className="h-11 w-full" />
 
+      {/* One block per element the real page renders, in the same order and
+          at the same height. A skeleton that omits the largest block — the
+          chain — produces the layout jump it exists to prevent. */}
       <Panel title="ACTIVE QUEST" className="flex flex-col items-center gap-6">
         <Block className="h-6 w-3/4" />
         <Block className="h-16 w-14 sm:h-24 sm:w-[5.25rem]" />
+        <Block className="h-3 w-48" />
         <div className="grid w-full grid-cols-2 gap-4">
           <Block className="h-16 w-full" />
           <Block className="h-16 w-full" />
         </div>
         <Block className="h-11 w-full" />
-        <Block className="h-4 w-full" />
+        <div className="flex w-full flex-col gap-2">
+          <Block className="h-4 w-full" />
+          <Block className="h-3 w-2/3" />
+        </div>
+        <Block className="h-3 w-32" />
       </Panel>
     </main>
   )
