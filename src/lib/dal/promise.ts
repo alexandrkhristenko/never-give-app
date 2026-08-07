@@ -9,6 +9,7 @@ import {
   planFreezes,
 } from '@/lib/streak'
 import { CHAIN_DAYS, chainWindowStart } from '@/lib/view/chain'
+import { validatePromiseTitle, validateUsername } from '@/lib/validation'
 import type { Profile, PublicProfile } from './user'
 
 export interface PromiseView {
@@ -325,4 +326,100 @@ export async function getPublicPromiseView(
       recentFrozen: withinChainWindow(frozenDates, today),
     }
   })
+}
+
+export type OnboardingError =
+  | 'invalid_username'
+  | 'reserved_username'
+  | 'username_taken'
+  | 'empty_promise'
+  | 'promise_too_long'
+  | 'unknown'
+
+export interface OnboardingInput {
+  username: string
+  promiseTitle: string
+  visibility: string
+  timezone: string
+}
+
+/** Postgres unique-violation SQLSTATE. */
+const UNIQUE_VIOLATION = '23505'
+
+/**
+ * The constraint a unique violation tripped, or null when the error is
+ * something else. postgres-js exposes it as `constraint_name`.
+ */
+function violatedConstraint(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+
+  const candidate = error as { code?: unknown; constraint_name?: unknown }
+  if (candidate.code !== UNIQUE_VIOLATION) return null
+
+  return typeof candidate.constraint_name === 'string'
+    ? candidate.constraint_name
+    : ''
+}
+
+/**
+ * Creates the user's profile row and their first promise.
+ *
+ * `users.id` is set from the verified auth id and the conflict target is `id`,
+ * not `email`: a row whose id drifts from auth.users.id is invisible to every
+ * RLS policy.
+ */
+export async function createProfileAndPromise(
+  session: { id: string; email: string },
+  input: OnboardingInput,
+): Promise<OnboardingError | null> {
+  const usernameError = validateUsername(input.username)
+  if (usernameError === 'invalid_format') return 'invalid_username'
+  if (usernameError === 'reserved') return 'reserved_username'
+
+  const titleError = validatePromiseTitle(input.promiseTitle)
+  if (titleError === 'empty') return 'empty_promise'
+  if (titleError === 'too_long') return 'promise_too_long'
+
+  const title = input.promiseTitle.trim()
+
+  const visibility = input.visibility === 'unlisted' ? 'unlisted' : 'public'
+
+  try {
+    await withUser(session.id, async (tx) => {
+      await tx
+        .insert(users)
+        .values({
+          id: session.id,
+          email: session.email,
+          username: input.username,
+          timezone: input.timezone,
+        })
+        .onConflictDoUpdate({
+          target: users.id,
+          set: { username: input.username, timezone: input.timezone },
+        })
+
+      await tx.insert(promises).values({
+        user_id: session.id,
+        title,
+        visibility,
+        cadence: 'daily',
+        status: 'active',
+      })
+    })
+  } catch (error) {
+    const constraint = violatedConstraint(error)
+
+    // Both the plain unique constraint and the case-insensitive index count
+    // as "taken". An email collision is a different problem and must not be
+    // reported as a username one.
+    if (constraint !== null && constraint.includes('username')) {
+      return 'username_taken'
+    }
+
+    console.error('Failed to complete onboarding', error)
+    return 'unknown'
+  }
+
+  return null
 }
