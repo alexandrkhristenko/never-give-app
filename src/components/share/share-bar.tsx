@@ -38,14 +38,14 @@ export default function ShareBar({ url, title }: ShareBarProps) {
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      <PixelButton variant="primary" onClick={share}>
+      <PixelButton variant="primary" className="min-w-0" onClick={share}>
         SHARE
       </PixelButton>
-      <PixelButton onClick={copy} aria-live="polite">
+      <PixelButton className="min-w-0" onClick={copy} aria-live="polite">
         {copied ? 'COPIED' : 'COPY LINK'}
       </PixelButton>
       <a
-        className="nes-btn inline-flex items-center justify-center"
+        className="nes-btn inline-flex min-w-0 items-center justify-center"
         href={`https://x.com/intent/tweet?text=${text}&url=${target}`}
         target="_blank"
         rel="noreferrer noopener"
@@ -53,7 +53,7 @@ export default function ShareBar({ url, title }: ShareBarProps) {
         X
       </a>
       <a
-        className="nes-btn inline-flex items-center justify-center"
+        className="nes-btn inline-flex min-w-0 items-center justify-center"
         href={`https://t.me/share/url?url=${target}&text=${text}`}
         target="_blank"
         rel="noreferrer noopener"

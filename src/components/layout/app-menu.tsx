@@ -49,11 +49,11 @@ export default function AppMenu({ username }: { username: string }) {
           <Link
             role="menuitem"
             href={`/${username}`}
-            className="font-mono text-xs underline"
+            className="min-w-0 font-mono text-xs underline"
           >
             View public profile
           </Link>
-          <form action={signOut}>
+          <form action={signOut} className="min-w-0">
             <button
               role="menuitem"
               type="submit"

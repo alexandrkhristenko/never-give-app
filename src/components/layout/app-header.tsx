@@ -17,7 +17,10 @@ export default function AppHeader({ username, theme }: AppHeaderProps) {
 
       <div className="flex items-center gap-2">
         {username ? (
-          <span className="hidden font-mono text-xs text-ink-muted sm:inline">
+          // min-w-0 + truncate: the username is user-controlled and this row
+          // does not wrap, so without them a long one widens the header past
+          // its container.
+          <span className="hidden min-w-0 truncate font-mono text-xs text-ink-muted sm:inline">
             @{username}
           </span>
         ) : null}

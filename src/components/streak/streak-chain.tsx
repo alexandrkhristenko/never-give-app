@@ -62,15 +62,15 @@ export default function StreakChain({ cells }: { cells: Cell[] }) {
         aria-hidden="true"
         className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-muted"
       >
-        <span>
+        <span className="min-w-0">
           <span className="mr-1 inline-block size-2 bg-streak align-middle" />
           check-in
         </span>
-        <span>
+        <span className="min-w-0">
           <span className="mr-1 inline-block size-2 bg-freeze align-middle" />
           freeze
         </span>
-        <span>
+        <span className="min-w-0">
           <span className="mr-1 inline-block size-2 bg-miss align-middle" />
           missed
         </span>
