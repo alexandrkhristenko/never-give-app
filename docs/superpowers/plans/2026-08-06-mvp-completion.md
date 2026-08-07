@@ -4498,13 +4498,16 @@ const DEMO_CHAIN = buildChain({
   startedOn: DEMO_START,
 })
 
+const FREEZE_START = '2026-08-01'
+const FREEZE_GAP = '2026-08-06'
+
 const FREEZE_DEMO = buildChain({
-  today: '2026-08-10',
-  checkinDates: datesBetween('2026-08-01', '2026-08-10').filter(
-    (date) => date !== '2026-08-06',
+  today: DEMO_TODAY,
+  checkinDates: datesBetween(FREEZE_START, DEMO_TODAY).filter(
+    (date) => date !== FREEZE_GAP,
   ),
-  frozenDates: ['2026-08-06'],
-  startedOn: '2026-08-01',
+  frozenDates: [FREEZE_GAP],
+  startedOn: FREEZE_START,
   days: 10,
 })
 
@@ -4618,9 +4621,16 @@ import Field from '@/components/ui/field'
 import PixelButton from '@/components/ui/pixel-button'
 import { login, signup } from './actions'
 
+type LoginMode = 'login' | 'signup'
+
+/**
+ * An error carries the mode it came from. Without that, failing a sign-in and
+ * then switching to sign-up leaves the old message on screen describing a flow
+ * the user is no longer in.
+ */
 type LoginState =
   | { status: 'idle' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; mode: LoginMode }
   | { status: 'check_email' }
 
 const INITIAL_STATE: LoginState = { status: 'idle' }
@@ -4632,15 +4642,21 @@ export default function LoginForm() {
   // their signatures stay untouched.
   const [state, action, pending] = useActionState(
     async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
+      const mode: LoginMode = isLogin ? 'login' : 'signup'
+
       if (isLogin) {
+        // On success login() redirects, which throws a control-flow exception,
+        // so nothing after this await runs and the component unmounts.
         const result = await login(formData)
         return result?.error
-          ? { status: 'error', message: result.error }
+          ? { status: 'error', message: result.error, mode }
           : { status: 'idle' }
       }
 
       const result = await signup(formData)
-      if (result?.error) return { status: 'error', message: result.error }
+      if (result?.error) {
+        return { status: 'error', message: result.error, mode }
+      }
       return { status: 'check_email' }
     },
     INITIAL_STATE,
@@ -4662,7 +4678,8 @@ export default function LoginForm() {
 
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.status === 'error' ? (
+      {state.status === 'error' &&
+      state.mode === (isLogin ? 'login' : 'signup') ? (
         <p role="alert" className="font-mono text-xs text-streak">
           {state.message}
         </p>
