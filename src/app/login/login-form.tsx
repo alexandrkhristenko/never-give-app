@@ -22,11 +22,18 @@ const INITIAL_STATE: LoginState = { status: 'idle' }
 
 export default function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
+  // useActionState has no way to reset its own state from an event handler,
+  // only by running the action again. This flag lets "Back to sign in"
+  // return to the form without waiting on that; it is cleared at the start
+  // of every submission so a later signup still shows its own check-email
+  // screen.
+  const [checkEmailDismissed, setCheckEmailDismissed] = useState(false)
 
   // The wrapper runs on the client and calls the existing server actions, so
   // their signatures stay untouched.
   const [state, action, pending] = useActionState(
     async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
+      setCheckEmailDismissed(false)
       const mode: LoginMode = isLogin ? 'login' : 'signup'
 
       if (isLogin) {
@@ -47,13 +54,24 @@ export default function LoginForm() {
     INITIAL_STATE,
   )
 
-  if (state.status === 'check_email') {
+  if (state.status === 'check_email' && !checkEmailDismissed) {
     return (
       <div className="flex flex-col items-center gap-6 text-center">
         <p role="status">REGISTRATION SUCCESSFUL</p>
         <p className="font-mono text-xs text-ink-muted">
           Check your email to verify the account before signing in.
         </p>
+        <PixelButton
+          type="button"
+          variant="primary"
+          full
+          onClick={() => {
+            setIsLogin(true)
+            setCheckEmailDismissed(true)
+          }}
+        >
+          Back to sign in
+        </PixelButton>
         <Link href="/" className="font-mono text-xs underline">
           Back to home
         </Link>
