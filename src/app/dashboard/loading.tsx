@@ -31,6 +31,9 @@ export default function DashboardLoading() {
         </div>
         <Block className="h-3 w-32" />
       </Panel>
+
+      {/* The "view public profile" link sits below the panel on the real page. */}
+      <Block className="mx-auto h-3 w-40" />
     </main>
   )
 }
