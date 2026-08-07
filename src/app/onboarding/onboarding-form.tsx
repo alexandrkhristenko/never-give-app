@@ -4,7 +4,11 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import Field from '@/components/ui/field'
 import PixelButton from '@/components/ui/pixel-button'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
-import { completeOnboarding, type OnboardingState } from './actions'
+import {
+  completeOnboarding,
+  type OnboardingField,
+  type OnboardingState,
+} from './actions'
 
 const INITIAL_STATE: OnboardingState = {}
 
@@ -24,9 +28,16 @@ export default function OnboardingForm() {
     }
   }, [])
 
+  // A field-scoped error goes to that Field; anything unattributable (a
+  // database failure) stays a form-level message.
+  const errorFor = (field: OnboardingField) =>
+    state.field === field ? state.error : undefined
+  const describedBy = (field: OnboardingField) =>
+    state.field === field ? `${field}-hint ${field}-error` : `${field}-hint`
+
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.error ? (
+      {state.error && !state.field ? (
         <p role="alert" className="font-mono text-xs text-streak">
           {state.error}
         </p>
@@ -36,6 +47,7 @@ export default function OnboardingForm() {
         id="username"
         label="Choose a username"
         hint={`never-give.app/${username || 'username'}`}
+        error={errorFor('username')}
       >
         <input
           type="text"
@@ -48,7 +60,8 @@ export default function OnboardingForm() {
           pattern="[a-zA-Z0-9_]+"
           autoComplete="off"
           title="Letters, digits and underscores, 3-20 characters"
-          aria-describedby="username-hint"
+          aria-describedby={describedBy('username')}
+          aria-invalid={state.field === 'username' || undefined}
           value={username}
           onChange={(event) => setUsername(event.target.value)}
         />
@@ -58,6 +71,7 @@ export default function OnboardingForm() {
         id="promise"
         label="Your main promise"
         hint={`${promiseLength} / ${PROMISE_MAX_LENGTH}`}
+        error={errorFor('promise')}
       >
         <input
           type="text"
@@ -67,7 +81,8 @@ export default function OnboardingForm() {
           placeholder="e.g. Code every day"
           required
           maxLength={PROMISE_MAX_LENGTH}
-          aria-describedby="promise-hint"
+          aria-describedby={describedBy('promise')}
+          aria-invalid={state.field === 'promise' || undefined}
           onChange={(event) => setPromiseLength(event.target.value.length)}
         />
       </Field>
