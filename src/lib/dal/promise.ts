@@ -8,7 +8,7 @@ import {
   earnedFreezeBalance,
   planFreezes,
 } from '@/lib/streak'
-import { chainWindowStart } from '@/lib/view/chain'
+import { CHAIN_DAYS, chainWindowStart } from '@/lib/view/chain'
 import type { Profile, PublicProfile } from './user'
 
 export interface PromiseView {
@@ -48,12 +48,17 @@ function earliest(dates: LocalDate[]): LocalDate | null {
   return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b))
 }
 
-/** Keeps only the dates the chain can show, so the DTO stays small. */
+/**
+ * Keeps only the dates the chain can show, so the DTO stays small.
+ * The window is contractually tied to `CHAIN_DAYS`: it must match what the
+ * chain view actually renders, not whichever default `chainWindowStart`
+ * happens to have.
+ */
 function withinChainWindow(
   dates: LocalDate[],
   today: LocalDate,
 ): LocalDate[] {
-  const from = chainWindowStart(today)
+  const from = chainWindowStart(today, CHAIN_DAYS)
   return dates.filter((date) => date >= from && date <= today)
 }
 
@@ -107,6 +112,29 @@ interface CoverageState {
 }
 
 /**
+ * Reads `users.streak_freezes_balance` and locks the row `FOR UPDATE`.
+ *
+ * A snapshot taken outside this transaction (e.g. from `getProfile()`, which
+ * runs its own transaction and is memoised by React `cache()`) is stale the
+ * instant a concurrent check-in or dashboard load spends or earns a freeze.
+ * The row lock is what serializes two such transactions against each other,
+ * starting from this statement — plan and both writes below must use the
+ * value read here, never a caller-supplied snapshot.
+ */
+async function lockFreezeBalance(
+  tx: DbTransaction,
+  userId: string,
+): Promise<number> {
+  const rows = await tx
+    .select({ freezeBalance: users.streak_freezes_balance })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for('update')
+
+  return rows[0]?.freezeBalance ?? 0
+}
+
+/**
  * Spends freezes on any completed day the user missed, then reports the
  * resulting coverage. Idempotent: a day already in `streak_freezes` is never
  * paid for twice.
@@ -114,9 +142,11 @@ interface CoverageState {
 async function applyPendingFreezes(
   tx: DbTransaction,
   promiseId: string,
-  profile: Profile,
+  userId: string,
   today: LocalDate,
 ): Promise<CoverageState> {
+  const freezeBalance = await lockFreezeBalance(tx, userId)
+
   const checkinDates = await selectCheckinDates(tx, promiseId)
   const frozenDates = await selectFrozenDates(tx, promiseId)
 
@@ -124,11 +154,11 @@ async function applyPendingFreezes(
     checkinDates,
     frozenDates,
     today,
-    freezeBalance: profile.freezeBalance,
+    freezeBalance,
   })
 
   if (plan.datesToFreeze.length === 0) {
-    return { checkinDates, frozenDates, freezeBalance: profile.freezeBalance }
+    return { checkinDates, frozenDates, freezeBalance }
   }
 
   await tx
@@ -141,17 +171,17 @@ async function applyPendingFreezes(
     )
     .onConflictDoNothing()
 
-  const freezeBalance = profile.freezeBalance - plan.datesToFreeze.length
+  const nextBalance = freezeBalance - plan.datesToFreeze.length
 
   await tx
     .update(users)
-    .set({ streak_freezes_balance: freezeBalance })
-    .where(eq(users.id, profile.id))
+    .set({ streak_freezes_balance: nextBalance })
+    .where(eq(users.id, userId))
 
   return {
     checkinDates,
     frozenDates: [...frozenDates, ...plan.datesToFreeze],
-    freezeBalance,
+    freezeBalance: nextBalance,
   }
 }
 
@@ -166,7 +196,12 @@ export async function getOwnPromiseView(
     const promise = await selectPrimaryPromise(tx, profile.id)
     if (!promise) return null
 
-    const coverage = await applyPendingFreezes(tx, promise.id, profile, today)
+    const coverage = await applyPendingFreezes(
+      tx,
+      promise.id,
+      profile.id,
+      today,
+    )
 
     const { current, best } = calculateStreak({
       checkinDates: coverage.checkinDates,
@@ -200,20 +235,29 @@ export interface CheckInResult {
  * multiple of seven. Safe to call twice: the unique constraint on
  * (promise_id, local_date) makes the second call a no-op.
  *
+ * Returns `null` when the user has no promise yet — deliberately distinct
+ * from a real, non-earning check-in result, which a caller must not confuse
+ * with "nothing was written."
+ *
  * The result is what the UI celebrates with, so it has to say whether a
  * freeze was actually earned rather than leaving the page to guess.
  */
 export async function checkIn(
   profile: Profile,
   now: Date = new Date(),
-): Promise<CheckInResult> {
+): Promise<CheckInResult | null> {
   const today = localDateOf(now, profile.timezone)
 
   return withUser(profile.id, async (tx) => {
     const promise = await selectPrimaryPromise(tx, profile.id)
-    if (!promise) return { alreadyCheckedIn: false, earnedFreeze: false }
+    if (!promise) return null
 
-    const coverage = await applyPendingFreezes(tx, promise.id, profile, today)
+    const coverage = await applyPendingFreezes(
+      tx,
+      promise.id,
+      profile.id,
+      today,
+    )
 
     const inserted = await tx
       .insert(checkins)

@@ -1915,7 +1915,7 @@ git commit -m "feat: add data access layer for session and profile"
   - `getOwnPromiseView(profile: Profile, now?: Date): Promise<PromiseView | null>`
   - `getPublicPromiseView(profile: PublicProfile, now?: Date): Promise<PublicPromiseView | null>`
   - `interface CheckInResult { alreadyCheckedIn: boolean; earnedFreeze: boolean }`
-  - `checkIn(profile: Profile, now?: Date): Promise<CheckInResult>`
+  - `checkIn(profile: Profile, now?: Date): Promise<CheckInResult | null>` — `null` означает «обещания нет», а не «отметка прошла»
   - `createProfileAndPromise(...)` — см. задачу 11
 
 **Контекст.** Порядок операций задан [docs/product-spec.md §4.7](../../product-spec.md):
@@ -1928,7 +1928,9 @@ git commit -m "feat: add data access layer for session and profile"
 
 Публичный профиль не пишет в БД намеренно: анонимный посетитель не должен провоцировать мутации. Следствие зафиксировано в [known-issues.md §2.1](../../known-issues.md).
 
-Списание заморозок и декремент баланса идут в одной транзакции, поэтому расхождение между журналом `streak_freezes` и `users.streak_freezes_balance` невозможно.
+Списание заморозок и декремент баланса идут в одной транзакции — но **одной атомарности мало**. При уровне изоляции READ COMMITTED параллельная транзакция не видна, поэтому баланс нельзя брать из снимка профиля, сделанного раньше и в другой транзакции: загрузка дашборда, идущая наперегонки с чек-ином, молча затрёт заработанную заморозку. Ни одно ограничение это не поймает — все ошибочные значения остаются внутри диапазона `0..3`, а уникальность `(promise_id, local_date)` лишь заставляет устаревшего писателя коммитить последним.
+
+Поэтому `applyPendingFreezes` читает баланс **внутри своей транзакции** и блокирует строку через `select ... for update` до планирования. Блокировка сериализует дашборд и чек-ин с первого же запроса и закрывает обе стороны: и потерю начисления, и показ устаревшего числа на экране.
 
 Оба DTO отдают не только числа стриков, но и **даты внутри окна цепочки** плюс `startedOn`. Без них экран не построит ленту дней, а без `startedOn` не отличит «пропустил» от «меня тогда ещё не было» (задача 4a). Даты режутся окном прямо здесь, а не на странице: DTO обязан оставаться минимальным ([architecture.md §5](../../architecture.md)), и отдавать наружу 365 записей ради тридцати клеток незачем.
 
@@ -3332,6 +3334,12 @@ export async function checkInAction(
 
   try {
     const result = await checkIn(profile)
+
+    // null means there is no promise to check in on. Reporting success here
+    // would render DONE FOR TODAY over an operation that wrote nothing.
+    if (!result) {
+      return { status: 'error', message: 'No active quest to check in on.' }
+    }
 
     revalidatePath('/dashboard')
     revalidatePath(`/${profile.username}`)
