@@ -11,9 +11,17 @@ const pressStart2P = Press_Start_2P({
   display: 'swap',
 })
 
+// Same fallback as `src/app/[username]/page.tsx` and `src/app/login/actions.ts`:
+// an unset variable means local development.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
 export const metadata: Metadata = {
   title: 'never-give.app',
   description: 'Promise publicly. Check in daily. Do not break the chain.',
+  // Next resolves file-convention og:image URLs against this. Without it,
+  // og:image falls back to VERCEL_PROJECT_PRODUCTION_URL or localhost, which
+  // disagrees with the origin the rest of the app (e.g. the share bar) uses.
+  metadataBase: new URL(SITE_URL),
 }
 
 export default async function RootLayout({
