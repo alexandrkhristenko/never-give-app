@@ -5088,6 +5088,9 @@ export { expect } from '@playwright/test'
 ```ts
 import { expect, test } from './fixtures'
 
+/** Same widths the layout suite uses, so the two agree on what "narrow" means. */
+const VIEWPORTS = [320, 375, 768, 1280]
+
 async function signIn(page: import('@playwright/test').Page, user: { email: string; password: string }) {
   await page.goto('/login')
   await page.getByLabel('Email').fill(user.email)
@@ -5115,9 +5118,25 @@ test('a new player onboards, checks in, and shows up publicly', async ({
 
   await expect(page.getByTestId('current-streak')).toHaveText('1')
   await expect(page.getByTestId('best-streak')).toHaveText('1')
-  await expect(
-    page.getByRole('button', { name: 'DONE FOR TODAY' }),
-  ).toBeDisabled()
+
+  // Not a disabled button: once there is nothing to do the form renders a
+  // status element instead, so that a keyboard user is not handed a control
+  // that cannot be focused and explains nothing.
+  await expect(page.getByRole('status')).toContainText('DONE FOR TODAY')
+
+  // The design spec wants the horizontal-overflow check on the dashboard and
+  // the public profile as well as the landing page. Those two need a session
+  // and a seeded user, so they are asserted here rather than in the
+  // session-free layout suite.
+  for (const width of VIEWPORTS) {
+    await page.setViewportSize({ width, height: 800 })
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    )
+    expect(overflow, `dashboard at ${width}px`).toBeLessThanOrEqual(0)
+  }
+  await page.setViewportSize({ width: 1280, height: 800 })
 
   // The public page must show the same streak to a visitor with no session.
   const visitor = await page.context().browser()!.newContext()
@@ -5128,6 +5147,15 @@ test('a new player onboards, checks in, and shows up publicly', async ({
     visitorPage.getByRole('heading', { name: user.username }),
   ).toBeVisible()
   await expect(visitorPage.getByTestId('current-streak')).toHaveText('1')
+
+  for (const width of VIEWPORTS) {
+    await visitorPage.setViewportSize({ width, height: 800 })
+    const overflow = await visitorPage.evaluate(
+      () => document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    )
+    expect(overflow, `public profile at ${width}px`).toBeLessThanOrEqual(0)
+  }
 
   await visitor.close()
 })
