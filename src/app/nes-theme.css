@@ -40,6 +40,16 @@
   background-color: var(--color-streak);
 }
 
+/*
+ * Required, not optional. NES.css's own `.nes-btn.is-warning` now sits in the
+ * lower `nes` layer, and layer order beats specificity — without this rule the
+ * bare `.nes-btn` above wins and a warning button renders as a plain one.
+ */
+.nes-btn.is-warning {
+  color: var(--color-warning-ink);
+  background-color: var(--color-warning);
+}
+
 .nes-input,
 .nes-textarea,
 .nes-select select {
