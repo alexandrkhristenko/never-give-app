@@ -26,6 +26,21 @@ const CELL_COLOR: Record<Cell['state'], string> = {
   empty: '#dfe1e4',
 }
 
+const TITLE_MAX_GRAPHEMES = 45
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
+
+/**
+ * Satori has no line clamping, so a long title would push the streak out of
+ * frame. Cut by grapheme, not by `String.length`: a title is capped at 80 UTF-16
+ * units, so an emoji can straddle the cut point and a naive `slice` would leave
+ * a lone surrogate — a broken glyph in the one image strangers actually see.
+ */
+function truncate(title: string): string {
+  const units = [...graphemes.segment(title)].map((entry) => entry.segment)
+  if (units.length <= TITLE_MAX_GRAPHEMES) return title
+  return `${units.slice(0, TITLE_MAX_GRAPHEMES).join('')}...`
+}
+
 export default async function Image({
   params,
 }: {
@@ -83,12 +98,10 @@ export default async function Image({
               color: INK,
               marginTop: 28,
               textAlign: 'center',
-              // Satori has no line clamping, so keep long titles from
-              // pushing the streak out of frame.
               maxWidth: 940,
             }}
           >
-            {title.length > 48 ? `${title.slice(0, 45)}...` : title}
+            {truncate(title)}
           </div>
 
           <div style={{ display: 'flex', gap: 6, marginTop: 44 }}>
