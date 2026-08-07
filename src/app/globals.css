@@ -1,27 +1,160 @@
+/*
+ * Layer order is the whole point of this file. NES.css ships unlayered, and
+ * unlayered rules beat layered ones no matter the specificity, so without
+ * `layer(nes)` every Tailwind utility loses to it.
+ */
+@layer theme, base, nes, components, utilities;
+
 @import "tailwindcss";
-@import "nes.css/css/nes.min.css";
+@import "nes.css/css/nes.min.css" layer(nes);
+@import "./nes-theme.css" layer(components);
 
-:root {
-  --background: #ffffff;
-  --foreground: #212529;
+@theme {
+  --font-pixel: var(--font-press-start), "Courier New", monospace;
+  --font-sans: var(--font-pixel);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /*
+   * Each token is written once. `light-dark()` resolves against the element's
+   * `color-scheme`, so switching themes means flipping that one property
+   * rather than restating the whole palette.
+   */
+  --color-bg: light-dark(#ebe9e4, #14171a);
+  --color-panel: light-dark(#ffffff, #21262b);
+  --color-ink: light-dark(#1a1d21, #f2f4f6);
+  --color-ink-muted: light-dark(#5b6169, #a3acb5);
+  --color-edge: light-dark(#1a1d21, #f2f4f6);
+  --color-streak: light-dark(#b3341c, #ff6b4a);
+  --color-freeze: light-dark(#1c5f8f, #5cb8e8);
+  --color-miss: light-dark(#b9bec4, #3a4148);
+  --color-empty: light-dark(#dfe1e4, #2a3036);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-press-start);
-  --font-mono: var(--font-press-start);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
+  /*
+   * Both schemes allowed: with no explicit choice the prefers-color-scheme
+   * media query decides, which is what `light dark` delegates to. The
+   * attribute then pins one, in either direction.
+   */
   :root {
-    --background: #212529;
-    --foreground: #ffffff;
+    color-scheme: light dark;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: var(--font-pixel);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-press-start), 'Courier New', Courier, monospace;
+@layer components {
+  /*
+   * The chain. Both the column count and which cells get trimmed come from
+   * the component, so CHAIN_DAYS and CHAIN_DAYS_COMPACT stay the single
+   * source of truth — no cell count is written here. `nth-child` cannot take
+   * a custom property, which is why the component marks the trimmed cells
+   * with `data-trimmed` instead.
+   */
+  .chain {
+    display: grid;
+    grid-template-columns: repeat(var(--chain-n), minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .chain > li[data-trimmed] {
+    display: none;
+  }
+
+  @media (width >= 40rem) {
+    .chain {
+      grid-template-columns: repeat(var(--chain-n-sm), minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .chain > li[data-trimmed] {
+      display: block;
+    }
+  }
+
+  .chain > li[data-today][data-state="checked"] {
+    animation: chain-pop 320ms steps(4, end) 1;
+  }
+
+  @keyframes chain-pop {
+    from {
+      transform: scale(0.2);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  /*
+   * The avatar. `.nes-mario` is a fixed 84x96 sprite, so it can only be
+   * resized with a transform — which is safe here because the wrapper's own
+   * width and height already account for the scale.
+   */
+  .avatar-stage {
+    --sprite-w: 84px;
+    --sprite-h: 96px;
+    --sprite-scale: 0.667;
+    position: relative;
+    width: calc(var(--sprite-w) * var(--sprite-scale));
+    height: calc(var(--sprite-h) * var(--sprite-scale));
+  }
+
+  @media (width >= 40rem) {
+    .avatar-stage {
+      --sprite-scale: 1;
+    }
+  }
+
+  .avatar-stage > .nes-mario {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scale(var(--sprite-scale));
+    transform-origin: top left;
+  }
+
+  .avatar-stage[data-stage="dormant"] > .nes-mario {
+    filter: grayscale(1);
+    opacity: 0.45;
+  }
+
+  .avatar-stage[data-stage="running"],
+  .avatar-stage[data-stage="blazing"],
+  .avatar-stage[data-stage="crowned"] {
+    animation: avatar-hop 700ms steps(2, end) infinite;
+  }
+
+  .avatar-stage[data-stage="blazing"],
+  .avatar-stage[data-stage="crowned"] {
+    box-shadow: 0 0 0 4px var(--color-streak);
+  }
+
+  .avatar-stage[data-stage="crowned"]::before {
+    content: "";
+    position: absolute;
+    inset-inline: 25%;
+    top: -10px;
+    height: 6px;
+    background-color: var(--color-streak);
+  }
+
+  @keyframes avatar-hop {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -4px;
+    }
+  }
 }

@@ -1,0 +1,80 @@
+/*
+ * The only place NES.css is overridden. Everything here relies on globals.css
+ * importing NES.css into the `nes` layer, which sits below `components`.
+ */
+
+.nes-container {
+  padding: 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+}
+
+@media (width >= 40rem) {
+  .nes-container {
+    padding: 1.5rem 2rem;
+  }
+}
+
+.nes-container.with-title > .title {
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+}
+
+.nes-btn {
+  /* WCAG target size. NES.css ships 6px/8px padding, which lands under 30px. */
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  cursor: pointer;
+}
+
+.nes-btn.is-primary {
+  color: var(--color-panel);
+  background-color: var(--color-freeze);
+}
+
+.nes-btn.is-success {
+  color: var(--color-panel);
+  background-color: var(--color-streak);
+}
+
+.nes-input,
+.nes-textarea,
+.nes-select select {
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+}
+
+/*
+ * NES.css replaces the system cursor with a base64 PNG on html and on every
+ * button. That overrides the user's cursor size and contrast settings, which
+ * some people depend on.
+ */
+html,
+.nes-btn,
+.nes-input,
+.nes-select select {
+  cursor: auto;
+}
+
+.nes-btn {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-streak);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
