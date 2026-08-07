@@ -2323,7 +2323,7 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
 
   /*
    * Amber is light in both themes, so its text stays dark either way and the
-   * ink token does not flip. Contrast against it: 8.2:1 light, 7.0:1 dark.
+   * ink token does not flip. Contrast against it: 7.8:1 light, 6.6:1 dark.
    */
   --color-warning: light-dark(#e8a317, #d99414);
   --color-warning-ink: #1a1d21;
