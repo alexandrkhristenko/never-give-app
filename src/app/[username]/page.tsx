@@ -1,173 +1,109 @@
-import { db } from '@/db';
-import { users, promises, checkins } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { notFound } from 'next/navigation';
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import AppHeader from '@/components/layout/app-header'
+import ShareBar from '@/components/share/share-bar'
+import AvatarStage from '@/components/streak/avatar-stage'
+import StreakChain from '@/components/streak/streak-chain'
+import StreakStats from '@/components/streak/streak-stats'
+import Panel from '@/components/ui/panel'
+import { pixelButtonClass } from '@/components/ui/pixel-button'
+import { getPublicProfile } from '@/lib/dal/user'
+import { getPublicPromiseView } from '@/lib/dal/promise'
+import { readThemeCookie } from '@/lib/theme'
+import { buildChain } from '@/lib/view/chain'
 
 interface PageProps {
-  params: Promise<{ username: string }>;
+  params: Promise<{ username: string }>
 }
 
-export async function generateMetadata({ params }: PageProps) {
-  const resolvedParams = await params;
-  
-  let dbUser: any, dbPromise: any, recentCheckins: { local_date: string }[] = [];
-  try {
-    const result = await db.select().from(users).where(eq(users.username, resolvedParams.username)).limit(1);
-    dbUser = result[0];
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://never-give.app'
 
-    if (dbUser) {
-      const promisesResult = await db.select().from(promises).where(eq(promises.user_id, dbUser.id)).limit(1);
-      dbPromise = promisesResult[0];
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { username } = await params
 
-      if (dbPromise && dbPromise.visibility !== 'private') {
-        const checkinsResult = await db.select({ local_date: checkins.local_date }).from(checkins)
-          .where(eq(checkins.promise_id, dbPromise.id))
-          .orderBy(desc(checkins.local_date))
-          .limit(365);
-        recentCheckins = checkinsResult;
-      }
-    }
-  } catch(e) {}
+  const profile = await getPublicProfile(username)
+  if (!profile) return { title: 'Player not found - never-give.app' }
 
-  let title = 'A new quest';
-  let streak = '0';
-  if (dbPromise) {
-    title = dbPromise.title;
-    const { current } = calculateStreak(recentCheckins.map(c => c.local_date));
-    streak = current.toString();
-  }
+  const promise = await getPublicPromiseView(profile)
 
   return {
-    title: `${resolvedParams.username}'s Streak - never-give.app`,
-    description: `Follow ${resolvedParams.username}'s journey.`,
-    openGraph: {
-      images: [`/api/og?username=${resolvedParams.username}&title=${encodeURIComponent(title)}&streak=${streak}`],
-    },
-  };
-}
-
-function calculateStreak(checkinDates: string[]): { current: number, best: number } {
-  if (checkinDates.length === 0) return { current: 0, best: 0 };
-  
-  const sorted = [...checkinDates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  let currentStreak = 0;
-  let bestStreak = 0;
-  let tempStreak = 0;
-  
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-  const hasCheckedInTodayOrYesterday = sorted[0] === todayStr || sorted[0] === yesterdayStr;
-  
-  if (!hasCheckedInTodayOrYesterday) {
-    currentStreak = 0;
+    title: `${profile.username}'s Streak - never-give.app`,
+    description: promise
+      ? `${profile.username} is committing to: ${promise.title}`
+      : `Follow ${profile.username}'s journey.`,
+    // Unlisted profiles are reachable by link but must stay out of search.
+    robots:
+      promise?.visibility === 'unlisted'
+        ? { index: false, follow: false }
+        : undefined,
   }
-
-  for (let i = 0; i < sorted.length; i++) {
-    tempStreak = 1;
-    let expectedNextDate = new Date(sorted[i]);
-    
-    for (let j = i + 1; j < sorted.length; j++) {
-      expectedNextDate.setDate(expectedNextDate.getDate() - 1);
-      const expectedStr = expectedNextDate.toISOString().split('T')[0];
-      
-      if (sorted[j] === expectedStr) {
-        tempStreak++;
-      } else {
-        break; 
-      }
-    }
-    
-    if (i === 0 && hasCheckedInTodayOrYesterday) {
-      currentStreak = tempStreak;
-    }
-    
-    if (tempStreak > bestStreak) {
-      bestStreak = tempStreak;
-    }
-  }
-
-  return { current: currentStreak, best: bestStreak };
 }
 
 export default async function PublicProfilePage({ params }: PageProps) {
-  const resolvedParams = await params;
-  
-  // Fetch user
-  let dbUser: any, dbPromise: any, recentCheckins: { local_date: string }[] = [];
-  try {
-    const result = await db.select().from(users).where(eq(users.username, resolvedParams.username)).limit(1);
-    dbUser = result[0];
+  const { username } = await params
 
-    if (!dbUser) {
-      notFound();
-    }
+  const profile = await getPublicProfile(username)
 
-    const promisesResult = await db.select().from(promises)
-      .where(eq(promises.user_id, dbUser.id))
-      .limit(1);
-    
-    dbPromise = promisesResult[0];
+  // notFound() throws a control-flow exception, so it stays out of try/catch.
+  if (!profile) notFound()
 
-    // Visibility rules:
-    // If it's private, nobody can see it except maybe the owner (but we are rendering a public route, so we just hide it)
-    if (dbPromise && dbPromise.visibility === 'private') {
-      notFound();
-    }
+  // Under the anon role a private promise is simply not returned.
+  const promise = await getPublicPromiseView(profile)
+  if (!promise) notFound()
 
-    if (dbPromise) {
-      const checkinsResult = await db.select({ local_date: checkins.local_date }).from(checkins)
-        .where(eq(checkins.promise_id, dbPromise.id))
-        .orderBy(desc(checkins.local_date))
-        .limit(365);
-      recentCheckins = checkinsResult;
-    }
-  } catch (e) {
-    // Mock for UI dev if DB fails
-    if (resolvedParams.username === 'test') {
-      dbUser = { username: 'test', avatar_level: 3 };
-      dbPromise = { title: 'Read 10 pages', visibility: 'public' };
-      recentCheckins = [];
-    } else {
-      notFound();
-    }
-  }
+  const theme = await readThemeCookie()
 
-  const { current: currentStreak, best: bestStreak } = calculateStreak(recentCheckins.map(c => c.local_date));
+  const cells = buildChain({
+    today: promise.today,
+    checkinDates: promise.recentCheckins,
+    frozenDates: promise.recentFrozen,
+    startedOn: promise.startedOn,
+  })
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-[#212529] text-white">
-      <div className="max-w-3xl mx-auto">
-        <div className="nes-container is-rounded bg-white text-black mb-8 p-8 flex flex-col items-center">
-          <h1 className="text-3xl mb-2">{dbUser.username}</h1>
-          <p className="text-gray-500 mb-8">is committing to:</p>
-          <h2 className="text-2xl text-center font-bold mb-12">"{dbPromise?.title}"</h2>
+    <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
+      {/* No username: the visitor is not necessarily signed in. */}
+      <AppHeader theme={theme} />
 
-          <div className="flex flex-col md:flex-row justify-around w-full items-center gap-8 mb-8">
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Current Streak</p>
-              <p className="text-6xl text-red-500">{currentStreak}</p>
-            </div>
-            
-            <div className="flex flex-col items-center">
-               <i className={`nes-mario ${currentStreak > 0 ? 'is-moving' : ''}`} style={{transform: 'scale(2.5)', margin: '2rem'}}></i>
-               <p className="text-sm mt-4">Lvl {dbUser.avatar_level}</p>
-            </div>
+      <Panel className="flex flex-col items-center gap-6">
+        <h1 className="min-w-0 truncate">{profile.username}</h1>
+        <p className="font-mono text-xs text-ink-muted">is committing to</p>
 
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-4">Best Streak</p>
-              <p className="text-6xl">{bestStreak}</p>
-            </div>
-          </div>
+        <p className="min-w-0 text-balance text-center [font-size:clamp(0.75rem,3.5vw,1.25rem)] [overflow-wrap:anywhere]">
+          {promise.title}
+        </p>
+
+        <AvatarStage currentStreak={promise.currentStreak} />
+
+        <div className="w-full">
+          <StreakStats
+            current={promise.currentStreak}
+            best={promise.bestStreak}
+          />
         </div>
-        
-        <div className="text-center">
-           <a href="/" className="nes-btn is-primary">Start Your Own Quest</a>
+
+        <div className="w-full">
+          <StreakChain cells={cells} />
         </div>
-      </div>
+
+        {promise.startedOn ? (
+          <p className="font-mono text-xs text-ink-muted">
+            since {promise.startedOn}
+          </p>
+        ) : null}
+      </Panel>
+
+      <ShareBar
+        url={`${SITE_URL}/${profile.username}`}
+        title={`${profile.username} is committing to: ${promise.title}`}
+      />
+
+      <p className="text-center">
+        <Link href="/" className={pixelButtonClass('primary')}>
+          Start your own quest
+        </Link>
+      </p>
     </main>
-  );
+  )
 }
