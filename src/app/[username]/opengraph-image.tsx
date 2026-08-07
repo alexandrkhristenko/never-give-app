@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { notFound } from 'next/navigation'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getPublicProfile } from '@/lib/dal/user'
@@ -8,6 +9,9 @@ import { buildChain, type Cell } from '@/lib/view/chain'
 export const alt = 'never-give.app streak'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
+// Bounds the URL space: without this, an unbounded username space each costs
+// two DB round trips plus a Satori render on every request.
+export const revalidate = 300
 
 const pressStart2P = await readFile(
   join(process.cwd(), 'assets/PressStart2P-Regular.ttf'),
@@ -51,18 +55,19 @@ export default async function Image({
   const profile = await getPublicProfile(username)
   const promise = profile ? await getPublicPromiseView(profile) : null
 
-  const displayName = profile?.username ?? 'Player'
-  const title = promise?.title ?? 'A new quest'
-  const streak = promise?.currentStreak ?? 0
+  // A private promise and a username nobody registered must be
+  // indistinguishable here, exactly as in `generateMetadata`. Rendering a
+  // fallback card for one and not the other would turn this route into an
+  // account-existence oracle. notFound() throws a control-flow exception, so
+  // it stays out of try/catch.
+  if (!profile || !promise) notFound()
 
-  const cells: Cell[] = promise
-    ? buildChain({
-        today: promise.today,
-        checkinDates: promise.recentCheckins,
-        frozenDates: promise.recentFrozen,
-        startedOn: promise.startedOn,
-      })
-    : []
+  const cells: Cell[] = buildChain({
+    today: promise.today,
+    checkinDates: promise.recentCheckins,
+    frozenDates: promise.recentFrozen,
+    startedOn: promise.startedOn,
+  })
 
   return new ImageResponse(
     (
@@ -88,7 +93,7 @@ export default async function Image({
             padding: 60,
           }}
         >
-          <div style={{ fontSize: 36, color: INK }}>{displayName}</div>
+          <div style={{ fontSize: 36, color: INK }}>{profile.username}</div>
           <div style={{ fontSize: 18, color: MUTED, marginTop: 24 }}>
             is committing to
           </div>
@@ -101,7 +106,7 @@ export default async function Image({
               maxWidth: 940,
             }}
           >
-            {truncate(title)}
+            {truncate(promise.title)}
           </div>
 
           <div style={{ display: 'flex', gap: 6, marginTop: 44 }}>
@@ -128,7 +133,7 @@ export default async function Image({
           >
             <span style={{ fontSize: 16, color: MUTED }}>CURRENT STREAK</span>
             <span style={{ fontSize: 88, color: CELL_COLOR.checked, marginTop: 16 }}>
-              {streak}
+              {promise.currentStreak}
             </span>
           </div>
         </div>
