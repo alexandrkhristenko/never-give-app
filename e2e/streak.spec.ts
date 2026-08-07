@@ -41,12 +41,17 @@ test('a new player onboards, checks in, and shows up publicly', async ({
   // session-free layout suite.
   for (const width of VIEWPORTS) {
     await page.setViewportSize({ width, height: 800 })
+    // Re-assert content at each width: an overflow check alone passes on a
+    // page that failed to render, because both measurements would be zero.
+    await expect(page.getByTestId('current-streak')).toBeVisible()
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth -
         document.documentElement.clientWidth,
     )
     expect(overflow, `dashboard at ${width}px`).toBeLessThanOrEqual(0)
   }
+  // Defensive: nothing below uses `page` today, but leaving it at 320px would
+  // silently change the conditions for anything added later.
   await page.setViewportSize({ width: 1280, height: 800 })
 
   // The public page must show the same streak to a visitor with no session.
@@ -61,6 +66,7 @@ test('a new player onboards, checks in, and shows up publicly', async ({
 
   for (const width of VIEWPORTS) {
     await visitorPage.setViewportSize({ width, height: 800 })
+    await expect(visitorPage.getByTestId('current-streak')).toBeVisible()
     const overflow = await visitorPage.evaluate(
       () => document.documentElement.scrollWidth -
         document.documentElement.clientWidth,

@@ -1,17 +1,23 @@
 import { expect, test } from '@playwright/test'
 
 const WIDTHS = [320, 375, 768, 1280]
-const PUBLIC_PATHS = ['/', '/login']
+// Each path carries a probe: an overflow check on its own passes on a page
+// that failed to render, since both measurements would then be zero.
+const PUBLIC_PATHS = [
+  { path: '/', probe: 'never-give.app' },
+  { path: '/login', probe: 'SIGN IN' },
+]
 
 // A page that scrolls sideways is broken on a phone, and it is the failure
 // mode a monospaced pixel font produces most easily.
 for (const width of WIDTHS) {
-  for (const path of PUBLIC_PATHS) {
+  for (const { path, probe } of PUBLIC_PATHS) {
     test(`${path} does not scroll horizontally at ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 })
       await page.goto(path)
+      await expect(page.getByText(probe).first()).toBeVisible()
 
       const overflow = await page.evaluate(() => {
         const root = document.documentElement
