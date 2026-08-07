@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import { asc, eq } from 'drizzle-orm'
 import { checkins, promises, streak_freezes, users } from '@/db/schema'
 import { withAnon, withUser, type DbTransaction } from '@/db/rls'
@@ -294,8 +295,14 @@ export async function checkIn(
 /**
  * The public view of a promise. Read-only on purpose: an anonymous visitor
  * must never trigger a write, so due freezes are not spent here.
+ *
+ * Memoised per render with React `cache()`: the profile page calls this both
+ * from `generateMetadata` and from the page body, and without memoisation
+ * those run as two independent transactions that could observe different
+ * data — e.g. a promise flipped to private between them would still be
+ * described in the `<title>`.
  */
-export async function getPublicPromiseView(
+export const getPublicPromiseView = cache(async function getPublicPromiseView(
   profile: PublicProfile,
   now: Date = new Date(),
 ): Promise<PublicPromiseView | null> {
@@ -326,7 +333,7 @@ export async function getPublicPromiseView(
       recentFrozen: withinChainWindow(frozenDates, today),
     }
   })
-}
+})
 
 export type OnboardingError =
   | 'invalid_username'
