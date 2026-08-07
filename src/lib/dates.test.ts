@@ -22,6 +22,18 @@ describe('localDateOf', () => {
   it('pads single-digit months and days', () => {
     expect(localDateOf(new Date('2026-01-02T12:00:00Z'), 'UTC')).toBe('2026-01-02')
   })
+
+  it('falls back to UTC for a zone the runtime does not know', () => {
+    const instant = new Date('2026-08-06T23:30:00Z')
+
+    expect(localDateOf(instant, 'Not/AZone')).toBe('2026-08-06')
+  })
+
+  it('leaves a known zone untouched', () => {
+    const instant = new Date('2026-08-06T23:30:00Z')
+
+    expect(localDateOf(instant, 'Europe/Kyiv')).toBe('2026-08-07')
+  })
 })
 
 describe('addDays', () => {

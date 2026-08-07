@@ -17,19 +17,40 @@ function fromUtcMillis(millis: number): LocalDate {
 /**
  * The calendar date an instant falls on in `timeZone`.
  * This is the only place the app converts an instant into a day.
+ *
+ * `timeZone` is expected to already be validated (see `safeTimezone` in
+ * `src/lib/dal/promise.ts`), but a bad value can still reach here from a row
+ * written before that validation existed. Falling back to UTC keeps this
+ * function pure and keeps a single stale row from taking a page down.
  */
 export function localDateOf(instant: Date, timeZone: string): LocalDate {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(instant)
+  const parts = formatDateParts(instant, timeZone)
 
   const valueOf = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)!.value
 
   return `${valueOf('year')}-${valueOf('month')}-${valueOf('day')}`
+}
+
+function formatDateParts(
+  instant: Date,
+  timeZone: string,
+): Intl.DateTimeFormatPart[] {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(instant)
+  } catch {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(instant)
+  }
 }
 
 /**

@@ -350,6 +350,21 @@ export interface OnboardingInput {
   timezone: string
 }
 
+/**
+ * A browser can report a zone this runtime's ICU does not know — newer tzdata
+ * on the client than on the server is enough. Storing it unchecked would make
+ * every later `localDateOf` throw, and with no settings screen there would be
+ * no way back.
+ */
+function safeTimezone(timezone: string): string {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
+    return timezone
+  } catch {
+    return 'UTC'
+  }
+}
+
 /** Postgres unique-violation SQLSTATE. */
 const UNIQUE_VIOLATION = '23505'
 
@@ -390,6 +405,7 @@ export async function createProfileAndPromise(
   const title = input.promiseTitle.trim()
 
   const visibility = input.visibility === 'unlisted' ? 'unlisted' : 'public'
+  const timezone = safeTimezone(input.timezone)
 
   try {
     await withUser(session.id, async (tx) => {
@@ -399,20 +415,28 @@ export async function createProfileAndPromise(
           id: session.id,
           email: session.email,
           username: input.username,
-          timezone: input.timezone,
+          timezone,
         })
         .onConflictDoUpdate({
           target: users.id,
-          set: { username: input.username, timezone: input.timezone },
+          set: { username: input.username, timezone },
         })
 
-      await tx.insert(promises).values({
-        user_id: session.id,
-        title,
-        visibility,
-        cadence: 'daily',
-        status: 'active',
-      })
+      // The MVP rule of "one promise per user" is enforced here, in
+      // application code, on purpose: `docs/data-model.md` deliberately
+      // leaves the schema open to multiple promises as a roadmap item, so no
+      // unique index exists. Without this check, a double-click on "START
+      // GAME" or a replayed POST would insert a second (or Nth) promise row.
+      const existing = await selectPrimaryPromise(tx, session.id)
+      if (!existing) {
+        await tx.insert(promises).values({
+          user_id: session.id,
+          title,
+          visibility,
+          cadence: 'daily',
+          status: 'active',
+        })
+      }
     })
   } catch (error) {
     const constraint = violatedConstraint(error)
