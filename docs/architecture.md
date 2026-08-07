@@ -7,7 +7,7 @@
 | Фреймворк | Next.js **16.3** (App Router) | Не та версия, что в обучающих данных моделей. См. §8 |
 | UI | React 19.2, Server Components по умолчанию | |
 | Стили | Tailwind CSS 4 + [NES.css](https://nostalgic-css.github.io/NES.css/) | 8-битная эстетика |
-| Шрифт | `Press_Start_2P` через `next/font/google` | Подмножества `latin`, `cyrillic` |
+| Шрифт | `Press_Start_2P` через `next/font/google` | Подмножество `latin` |
 | Аутентификация | Supabase Auth (`@supabase/ssr`) | Google, GitHub, email+пароль |
 | БД | PostgreSQL (Supabase) | |
 | Доступ к БД | Drizzle ORM + `postgres-js` | `prepare: false` — pooler в transaction mode |
@@ -27,7 +27,6 @@
 /<username>              Публичный профиль. Динамический сегмент в корне
 /auth/signin             POST-роут: старт OAuth-редиректа
 /auth/callback           GET-роут: обмен кода на сессию
-/api/og                  GET-роут: генерация OG-картинки
 ```
 
 Публичный профиль занимает **корневой** сегмент, поэтому username не может
@@ -49,7 +48,6 @@ src/
     [username]/             page.tsx + not-found.tsx
     auth/signin/route.ts    Старт OAuth
     auth/callback/route.ts  Обмен кода на сессию
-    api/og/route.tsx        OG-картинка
   db/
     index.ts                Подключение Drizzle (сервисное, без RLS)
     rls.ts                  Обёртки withUser / withAnon — запросы под RLS
@@ -178,7 +176,6 @@ Cache Components (`cacheComponents: true`) **не включены**. Дейст
 | Файл | Среда | Почему |
 |---|---|---|
 | `src/proxy.ts` | Node.js runtime | Proxy в Next 16 работает на Node |
-| `src/app/api/og/route.tsx` | Node.js runtime | Загружает файл шрифта с диска |
 | Страницы и server actions | Node.js runtime | Обращаются к Postgres через сокет |
 | `src/app/login/page.tsx` | Node.js runtime (Server Component) | Читает cookie темы, остального не нужно |
 | `src/app/login/login-form.tsx` | Браузер (`'use client'`) | Интерактивная форма |
