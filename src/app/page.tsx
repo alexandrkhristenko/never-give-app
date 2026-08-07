@@ -24,13 +24,16 @@ const DEMO_CHAIN = buildChain({
   startedOn: DEMO_START,
 })
 
+const FREEZE_START = '2026-08-01'
+const FREEZE_GAP = '2026-08-06'
+
 const FREEZE_DEMO = buildChain({
-  today: '2026-08-10',
-  checkinDates: datesBetween('2026-08-01', '2026-08-10').filter(
-    (date) => date !== '2026-08-06',
+  today: DEMO_TODAY,
+  checkinDates: datesBetween(FREEZE_START, DEMO_TODAY).filter(
+    (date) => date !== FREEZE_GAP,
   ),
-  frozenDates: ['2026-08-06'],
-  startedOn: '2026-08-01',
+  frozenDates: [FREEZE_GAP],
+  startedOn: FREEZE_START,
   days: 10,
 })
 

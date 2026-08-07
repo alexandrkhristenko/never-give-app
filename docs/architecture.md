@@ -94,7 +94,7 @@ src/
 ### Email + пароль
 
 ```
-/login (Client Component, useActionState)
+/login (Server Component) + login-form.tsx (Client Component, useActionState)
   → server action login() → supabase.auth.signInWithPassword()
   → redirect на /dashboard
 
@@ -180,7 +180,8 @@ Cache Components (`cacheComponents: true`) **не включены**. Дейст
 | `src/proxy.ts` | Node.js runtime | Proxy в Next 16 работает на Node |
 | `src/app/api/og/route.tsx` | Node.js runtime | Загружает файл шрифта с диска |
 | Страницы и server actions | Node.js runtime | Обращаются к Postgres через сокет |
-| `src/app/login/page.tsx` | Браузер (`'use client'`) | Интерактивная форма |
+| `src/app/login/page.tsx` | Node.js runtime (Server Component) | Читает cookie темы, остального не нужно |
+| `src/app/login/login-form.tsx` | Браузер (`'use client'`) | Интерактивная форма |
 | `src/app/onboarding/onboarding-form.tsx` | Браузер (`'use client'`) | `useActionState`, определение таймзоны |
 
 ## 8. Особенности Next.js 16, важные для этого проекта
