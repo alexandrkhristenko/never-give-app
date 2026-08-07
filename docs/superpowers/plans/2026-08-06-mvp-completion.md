@@ -2320,6 +2320,13 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
   --color-freeze: light-dark(#1c5f8f, #5cb8e8);
   --color-miss: light-dark(#b9bec4, #3a4148);
   --color-empty: light-dark(#dfe1e4, #2a3036);
+
+  /*
+   * Amber is light in both themes, so its text stays dark either way and the
+   * ink token does not flip. Contrast against it: 8.2:1 light, 7.0:1 dark.
+   */
+  --color-warning: light-dark(#e8a317, #d99414);
+  --color-warning-ink: #1a1d21;
 }
 
 @layer base {
@@ -2497,6 +2504,16 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
 .nes-btn.is-success {
   color: var(--color-panel);
   background-color: var(--color-streak);
+}
+
+/*
+ * Required, not optional. NES.css's own `.nes-btn.is-warning` now sits in the
+ * lower `nes` layer, and layer order beats specificity — without this rule the
+ * bare `.nes-btn` above wins and a warning button renders as a plain one.
+ */
+.nes-btn.is-warning {
+  color: var(--color-warning-ink);
+  background-color: var(--color-warning);
 }
 
 .nes-input,
