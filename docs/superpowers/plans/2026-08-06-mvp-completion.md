@@ -3642,7 +3642,8 @@ git commit -m "fix: rebuild dashboard on the data access layer"
 - Produces:
   - `createProfileAndPromise(session: SessionUser, input: OnboardingInput): Promise<OnboardingError | null>` в `src/lib/dal/promise.ts`
   - `type OnboardingError = 'invalid_username' | 'reserved_username' | 'username_taken' | 'empty_promise' | 'promise_too_long' | 'unknown'`
-  - `interface OnboardingState { error?: string }`
+  - `type OnboardingField = 'username' | 'promise'`
+  - `interface OnboardingState { error?: string; field?: OnboardingField }` — `field` привязывает сообщение к конкретному контролу
   - `completeOnboarding(prevState: OnboardingState, formData: FormData): Promise<OnboardingState>`
 
 **Контекст.** Чинятся дефекты 1.4 и 1.5 из [known-issues.md](../../known-issues.md). Сейчас занятый username даёт `catch` → `return`, и форма молча ничего не делает. Плюс апсерт идёт с целью конфликта `email` вместо `id`, из-за чего `users.id` может разойтись с `auth.users.id` и сломать все политики RLS.
@@ -3772,8 +3773,25 @@ import {
 } from '@/lib/dal/promise'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
 
+/**
+ * `field` says which control the message belongs to, so the form can hand it
+ * to that `Field` and mark the control invalid. Without it a screen-reader
+ * user tabbing field by field never learns *which* input was rejected.
+ */
+export type OnboardingField = 'username' | 'promise'
+
 export interface OnboardingState {
   error?: string
+  field?: OnboardingField
+}
+
+const FIELDS: Record<OnboardingError, OnboardingField | undefined> = {
+  invalid_username: 'username',
+  reserved_username: 'username',
+  username_taken: 'username',
+  empty_promise: 'promise',
+  promise_too_long: 'promise',
+  unknown: undefined,
 }
 
 const MESSAGES: Record<OnboardingError, string> = {
@@ -3799,7 +3817,7 @@ export async function completeOnboarding(
     timezone: String(formData.get('timezone') || 'UTC'),
   })
 
-  if (error) return { error: MESSAGES[error] }
+  if (error) return { error: MESSAGES[error], field: FIELDS[error] }
 
   // Outside any try/catch: redirect() throws a control-flow exception.
   redirect('/dashboard')
@@ -3817,7 +3835,11 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import Field from '@/components/ui/field'
 import PixelButton from '@/components/ui/pixel-button'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
-import { completeOnboarding, type OnboardingState } from './actions'
+import {
+  completeOnboarding,
+  type OnboardingField,
+  type OnboardingState,
+} from './actions'
 
 const INITIAL_STATE: OnboardingState = {}
 
@@ -3837,9 +3859,16 @@ export default function OnboardingForm() {
     }
   }, [])
 
+  // A field-scoped error goes to that Field; anything unattributable (a
+  // database failure) stays a form-level message.
+  const errorFor = (field: OnboardingField) =>
+    state.field === field ? state.error : undefined
+  const describedBy = (field: OnboardingField) =>
+    state.field === field ? `${field}-hint ${field}-error` : `${field}-hint`
+
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.error ? (
+      {state.error && !state.field ? (
         <p role="alert" className="font-mono text-xs text-streak">
           {state.error}
         </p>
@@ -3849,6 +3878,7 @@ export default function OnboardingForm() {
         id="username"
         label="Choose a username"
         hint={`never-give.app/${username || 'username'}`}
+        error={errorFor('username')}
       >
         <input
           type="text"
@@ -3861,7 +3891,8 @@ export default function OnboardingForm() {
           pattern="[a-zA-Z0-9_]+"
           autoComplete="off"
           title="Letters, digits and underscores, 3-20 characters"
-          aria-describedby="username-hint"
+          aria-describedby={describedBy('username')}
+          aria-invalid={state.field === 'username' || undefined}
           value={username}
           onChange={(event) => setUsername(event.target.value)}
         />
@@ -3871,6 +3902,7 @@ export default function OnboardingForm() {
         id="promise"
         label="Your main promise"
         hint={`${promiseLength} / ${PROMISE_MAX_LENGTH}`}
+        error={errorFor('promise')}
       >
         <input
           type="text"
@@ -3880,7 +3912,8 @@ export default function OnboardingForm() {
           placeholder="e.g. Code every day"
           required
           maxLength={PROMISE_MAX_LENGTH}
-          aria-describedby="promise-hint"
+          aria-describedby={describedBy('promise')}
+          aria-invalid={state.field === 'promise' || undefined}
           onChange={(event) => setPromiseLength(event.target.value.length)}
         />
       </Field>
