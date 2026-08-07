@@ -2190,8 +2190,14 @@ export async function checkIn(
 /**
  * The public view of a promise. Read-only on purpose: an anonymous visitor
  * must never trigger a write, so due freezes are not spent here.
+ *
+ * Memoised per render like `getPublicProfile`: the profile page queries it
+ * from both `generateMetadata` and the page body, which run separately. Without
+ * this the page issues two independent transactions and the two can observe
+ * different data — a promise flipped to private between them would still be
+ * described in the <title> tag.
  */
-export async function getPublicPromiseView(
+export const getPublicPromiseView = cache(async function getPublicPromiseView(
   profile: PublicProfile,
   now: Date = new Date(),
 ): Promise<PublicPromiseView | null> {
@@ -2222,7 +2228,13 @@ export async function getPublicPromiseView(
       recentFrozen: withinChainWindow(frozenDates, today),
     }
   })
-}
+})
+```
+
+Добавить в импорты в начале файла:
+
+```ts
+import { cache } from 'react'
 ```
 
 - [ ] **Step 2: Проверить компиляцию**
@@ -4078,24 +4090,31 @@ interface PageProps {
   params: Promise<{ username: string }>
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://never-give.app'
+// Same fallback as `src/app/login/actions.ts` and README §Переменные: an unset
+// variable means local development, so the share button must copy a localhost
+// URL rather than a production one that may resolve to somebody else's account.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params
 
   const profile = await getPublicProfile(username)
-  if (!profile) return { title: 'Player not found - never-give.app' }
+  const promise = profile ? await getPublicPromiseView(profile) : null
 
-  const promise = await getPublicPromiseView(profile)
+  // A private promise and a username nobody registered must be
+  // indistinguishable here, exactly as they are in the page body. Returning a
+  // profile-shaped title for one and a generic one for the other would turn
+  // the <title> tag into an account-existence oracle.
+  if (!profile || !promise) {
+    return { title: 'Player not found - never-give.app' }
+  }
 
   return {
     title: `${profile.username}'s Streak - never-give.app`,
-    description: promise
-      ? `${profile.username} is committing to: ${promise.title}`
-      : `Follow ${profile.username}'s journey.`,
+    description: `${profile.username} is committing to: ${promise.title}`,
     // Unlisted profiles are reachable by link but must stay out of search.
     robots:
-      promise?.visibility === 'unlisted'
+      promise.visibility === 'unlisted'
         ? { index: false, follow: false }
         : undefined,
   }
