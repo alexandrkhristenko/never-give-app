@@ -76,6 +76,12 @@ test('a failed sign-in does not leave its error on the sign-up form', async ({
 
 test('switching back does not resurrect the error either', async ({ page }) => {
   await submit(page)
+  // Load-bearing wait. Without it this test clicked through while the action
+  // was still in flight and asserted against a form that had never shown an
+  // error — passing against any implementation, including the broken one it
+  // was written to catch. Adding the wait turned it red immediately: the
+  // error really did come back.
+  await expect(alerts(page)).toBeVisible()
   await page.getByRole('button', { name: /no account yet/i }).click()
   await page.getByRole('button', { name: /already have an account/i }).click()
 
