@@ -53,6 +53,13 @@ export default function AppMenu({ username }: { username: string }) {
           >
             View public profile
           </Link>
+          <Link
+            role="menuitem"
+            href="/settings"
+            className="min-w-0 font-mono text-xs underline"
+          >
+            Settings
+          </Link>
           <form action={signOut} className="min-w-0">
             <button
               role="menuitem"

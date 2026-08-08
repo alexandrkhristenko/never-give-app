@@ -53,3 +53,38 @@ export function validatePromiseTitle(title: string): PromiseTitleError | null {
   if (trimmed.length > PROMISE_MAX_LENGTH) return 'too_long'
   return null
 }
+
+/**
+ * The three values `promises_visibility_check` accepts. Anything else is
+ * refused by the database, so the list is duplicated here only to reject it a
+ * step earlier with a message a person can act on.
+ *
+ * `private` was supported all the way down — the CHECK constraint, four RLS
+ * policies, `generateMetadata` and the OG route all handle it — while no form
+ * ever offered it. The settings screen is where it finally becomes reachable.
+ */
+export const VISIBILITY_VALUES = ['public', 'unlisted', 'private'] as const
+
+export type Visibility = (typeof VISIBILITY_VALUES)[number]
+
+export function isVisibility(value: string): value is Visibility {
+  return (VISIBILITY_VALUES as readonly string[]).includes(value)
+}
+
+/**
+ * Whether this runtime's ICU knows the zone.
+ *
+ * Onboarding deliberately falls back to UTC for an unknown zone, because the
+ * value arrives from the browser unprompted and a rejected signup would be a
+ * worse outcome than a wrong clock. Settings must not do that: here the person
+ * chose the value, and silently storing something else is a lie about what
+ * they just did.
+ */
+export function isKnownTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
+    return true
+  } catch {
+    return false
+  }
+}

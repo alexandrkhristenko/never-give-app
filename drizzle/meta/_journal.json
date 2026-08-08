@@ -43,6 +43,13 @@
       "when": 1786045422738,
       "tag": "0005_touch_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786045423738,
+      "tag": "0006_account_settings",
+      "breakpoints": true
     }
   ]
 }

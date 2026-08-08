@@ -74,6 +74,23 @@
   background-color: var(--color-warning);
 }
 
+/*
+ * Destructive actions. Inverted rather than red, because red already means two
+ * other things in this interface — see the note on the `danger` variant.
+ *
+ * The colour pair needs no separate contrast measurement: it is ink against
+ * panel, the same pair the body text uses, swapped. Whatever the base text
+ * passes, this passes.
+ *
+ * Overriding NES.css's own `.nes-btn.is-error` for the reason `is-warning`
+ * documents: theirs sits in the lower `nes` layer, and layer order beats
+ * specificity.
+ */
+.nes-btn.is-error {
+  color: var(--color-panel);
+  background-color: var(--color-edge);
+}
+
 .nes-input,
 .nes-textarea,
 .nes-select select {
