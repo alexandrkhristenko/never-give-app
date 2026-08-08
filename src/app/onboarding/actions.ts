@@ -6,8 +6,9 @@ import {
   createProfileAndPromise,
   type OnboardingError,
 } from '@/lib/dal/promise'
-import { PROMISE_MAX_LENGTH } from '@/lib/validation'
+import { PROMISE_MAX_LENGTH, validateUsername } from '@/lib/validation'
 import { RATE_LIMITED_MESSAGE, withinRateLimit } from '@/lib/rate-limit'
+import { isUsernameTaken } from '@/lib/dal/username'
 
 /**
  * `field` says which control the message belongs to, so the form can hand it
@@ -38,6 +39,44 @@ const FIELDS: Record<OnboardingError, OnboardingField | undefined> = {
   empty_promise: 'promise',
   promise_too_long: 'promise',
   unknown: undefined,
+}
+
+/** What the live check under the username field can report. */
+export type UsernameStatus =
+  | 'available'
+  | 'taken'
+  | 'invalid'
+  | 'reserved'
+  | 'rate_limited'
+  | 'unknown'
+
+/**
+ * Answers whether a username is free, while the person is still typing it.
+ *
+ * Requires a session: this runs during onboarding, and there is no reason for
+ * a signed-out caller to have a faster oracle than the profile pages already
+ * provide.
+ *
+ * The format is checked here rather than trusted from the client, so a
+ * malformed name costs no database round trip and the reserved list cannot be
+ * probed by turning off JavaScript.
+ */
+export async function checkUsername(username: string): Promise<UsernameStatus> {
+  await requireSessionUser()
+
+  const invalid = validateUsername(username)
+  if (invalid === 'invalid_format') return 'invalid'
+  if (invalid === 'reserved') return 'reserved'
+
+  if (!(await withinRateLimit('username'))) return 'rate_limited'
+
+  try {
+    return (await isUsernameTaken(username)) ? 'taken' : 'available'
+  } catch {
+    // The submit path checks again against the unique constraint, so a failure
+    // here costs a hint rather than correctness.
+    return 'unknown'
+  }
 }
 
 export async function completeOnboarding(
