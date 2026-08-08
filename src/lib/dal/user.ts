@@ -3,6 +3,8 @@ import { cache } from 'react'
 import { eq, sql } from 'drizzle-orm'
 import { users } from '@/db/schema'
 import { withAnon, withUser } from '@/db/rls'
+import { logWarn } from '@/lib/log'
+import { isKnownTimezone } from '@/lib/validation'
 import { getSessionUser } from './session'
 
 /** The signed-in user's own profile. Never leaves the server with `email`. */
@@ -40,7 +42,21 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       .limit(1),
   )
 
-  return rows[0] ?? null
+  const profile = rows[0] ?? null
+
+  // `localDateOf` falls back to UTC for a zone this runtime cannot resolve,
+  // which keeps one stale row from taking a page down — and makes the row
+  // invisible while it quietly computes the wrong day boundary. Noticing it
+  // belongs here rather than in `lib/dates`: that module is pure and called
+  // once per date, this runs once per request and knows whose row it is.
+  if (profile && !isKnownTimezone(profile.timezone)) {
+    logWarn('profile.timezone_unresolvable', {
+      userId: profile.id,
+      timezone: profile.timezone,
+    })
+  }
+
+  return profile
 })
 
 /** Looks a profile up by username, case-insensitively, as an anonymous reader. */

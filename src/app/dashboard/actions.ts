@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getProfile } from '@/lib/dal/user'
 import { checkIn } from '@/lib/dal/promise'
+import { logError } from '@/lib/log'
 
 export type CheckInState =
   | { status: 'idle' }
@@ -39,7 +40,7 @@ export async function checkInAction(
 
     return { status: 'ok', earnedFreeze: result.earnedFreeze }
   } catch (error) {
-    console.error('Check-in failed', error)
+    logError('checkin.failed', error)
     return { status: 'error', message: 'Could not check in. Please try again.' }
   }
 }

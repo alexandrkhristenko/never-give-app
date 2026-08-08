@@ -9,6 +9,7 @@ import {
 import { PROMISE_MAX_LENGTH, validateUsername } from '@/lib/validation'
 import { RATE_LIMITED_MESSAGE, withinRateLimit } from '@/lib/rate-limit'
 import { isUsernameTaken } from '@/lib/dal/username'
+import { logError } from '@/lib/log'
 
 /**
  * `field` says which control the message belongs to, so the form can hand it
@@ -72,9 +73,11 @@ export async function checkUsername(username: string): Promise<UsernameStatus> {
 
   try {
     return (await isUsernameTaken(username)) ? 'taken' : 'available'
-  } catch {
+  } catch (error) {
     // The submit path checks again against the unique constraint, so a failure
-    // here costs a hint rather than correctness.
+    // here costs a hint rather than correctness. Still recorded: a check that
+    // never answers would otherwise look like a UI that simply does nothing.
+    logError('username.check', error)
     return 'unknown'
   }
 }

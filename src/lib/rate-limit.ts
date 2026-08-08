@@ -2,6 +2,7 @@ import 'server-only'
 import { headers } from 'next/headers'
 import { sql } from 'drizzle-orm'
 import { withAnon } from '@/db/rls'
+import { logError } from '@/lib/log'
 
 /**
  * Request rate limiting, counted in Postgres.
@@ -113,7 +114,12 @@ export async function spendBudget(
       const rows = result as unknown as Array<{ allowed: boolean }>
       return rows[0]?.allowed === true
     })
-  } catch {
+  } catch (error) {
+    // Without this line a database outage is indistinguishable from ordinary
+    // traffic hitting its limit — every user is refused, and the logs say
+    // nothing but "too many attempts". The bucket is safe to record; it is an
+    // address and a scope, not content.
+    logError('ratelimit.unavailable', error, { bucket })
     return false
   }
 }

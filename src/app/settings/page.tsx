@@ -7,6 +7,7 @@ import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
 import { readThemeCookie } from '@/lib/theme'
+import { logError } from '@/lib/log'
 import DeleteAccount from './delete-account'
 import PromiseForm from './promise-form'
 import TimezoneForm from './timezone-form'
@@ -28,9 +29,12 @@ export const metadata: Metadata = {
 function supportedTimezones(): string[] {
   try {
     return Intl.supportedValuesOf('timeZone')
-  } catch {
+  } catch (error) {
     // Older ICU builds lack the enumeration. A single-entry list keeps the
-    // control honest rather than showing an empty select.
+    // control honest rather than showing an empty select — but a settings
+    // screen offering exactly one timezone is a broken screen, not a quirk,
+    // so it is worth saying so out loud.
+    logError('settings.timezones_unavailable', error)
     return ['UTC']
   }
 }

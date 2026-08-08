@@ -7,6 +7,7 @@ import {
   isVisibility,
   validatePromiseTitle,
 } from '@/lib/validation'
+import { logError } from '@/lib/log'
 import type { SessionUser } from './session'
 
 /**
@@ -64,7 +65,8 @@ export async function updatePromise(
       // been bitten by twice.
       return rows.length > 0 ? null : 'not_found'
     })
-  } catch {
+  } catch (error) {
+    logError('promise.update', error, { userId: session.id })
     return 'unknown'
   }
 }
@@ -94,7 +96,8 @@ export async function updateTimezone(
 
       return rows.length > 0 ? null : 'not_found'
     })
-  } catch {
+  } catch (error) {
+    logError('timezone.update', error, { userId: session.id })
     return 'unknown'
   }
 }
@@ -125,7 +128,10 @@ export async function deleteAccount(
       await tx.execute(sql`select private.delete_own_account()`)
     })
     return null
-  } catch {
+  } catch (error) {
+    // A deletion that fails silently leaves somebody believing their data is
+    // gone. This is the one failure here that must always be visible.
+    logError('account.delete', error, { userId: session.id })
     return 'unknown'
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/streak'
 import { CHAIN_DAYS, chainWindowStart } from '@/lib/view/chain'
 import { validatePromiseTitle, validateUsername } from '@/lib/validation'
+import { logError } from '@/lib/log'
 import type { Profile, PublicProfile } from './user'
 
 export interface PromiseView {
@@ -463,7 +464,7 @@ export async function createProfileAndPromise(
       return 'username_taken'
     }
 
-    console.error('Failed to complete onboarding', error)
+    logError('onboarding.failed', error, { userId: session.id })
     return 'unknown'
   }
 
