@@ -371,16 +371,25 @@ const UNIQUE_VIOLATION = '23505'
 /**
  * The constraint a unique violation tripped, or null when the error is
  * something else. postgres-js exposes it as `constraint_name`.
+ *
+ * Drizzle wraps driver errors in a `DrizzleQueryError` and puts the original
+ * under `cause`, so the fields this reads are one level down. Inspecting only
+ * the outer error made every taken username report itself as an unknown
+ * failure — the exact silent-failure this function exists to prevent.
  */
 function violatedConstraint(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null
+  for (let current = error; current; current = (current as { cause?: unknown }).cause) {
+    if (typeof current !== 'object') return null
 
-  const candidate = error as { code?: unknown; constraint_name?: unknown }
-  if (candidate.code !== UNIQUE_VIOLATION) return null
+    const candidate = current as { code?: unknown; constraint_name?: unknown }
+    if (candidate.code === UNIQUE_VIOLATION) {
+      return typeof candidate.constraint_name === 'string'
+        ? candidate.constraint_name
+        : ''
+    }
+  }
 
-  return typeof candidate.constraint_name === 'string'
-    ? candidate.constraint_name
-    : ''
+  return null
 }
 
 /**
