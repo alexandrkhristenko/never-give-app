@@ -2,8 +2,15 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+import { RATE_LIMITED_MESSAGE, withinRateLimit } from '@/lib/rate-limit';
 
 export async function login(formData: FormData) {
+  // Checked before the credentials are read, so a caller cannot learn anything
+  // about an address by how long the rejection takes.
+  if (!(await withinRateLimit('signin'))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   const email = formData.get('email') as string;
@@ -22,6 +29,10 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
+  if (!(await withinRateLimit('signup'))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   const email = formData.get('email') as string;

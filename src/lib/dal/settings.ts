@@ -107,10 +107,12 @@ export async function updateTimezone(
  * where it can neither be used nor registered again.
  *
  * No role the app runs as may touch `auth.users`, so this calls
- * `public.delete_own_account()` — a `security definer` function that takes no
+ * `private.delete_own_account()` — a `security definer` function that takes no
  * arguments and derives its target from the verified JWT. See migration 0006
- * for why it is shaped that way. The cascade from `users_id_auth_users_id_fk`
- * removes the profile, promises, checkins and freezes.
+ * for why it is shaped that way, and 0007 for why it lives in `private`:
+ * PostgREST publishes `public`, and a schema it does not route is a stronger
+ * guarantee than a grant. The cascade from `users_id_auth_users_id_fk` removes
+ * the profile, promises, checkins and freezes.
  *
  * Verified against a live database inside a rolled-back transaction: the
  * caller's rows vanish, a second account in the same transaction is untouched.
@@ -120,7 +122,7 @@ export async function deleteAccount(
 ): Promise<SettingsError | null> {
   try {
     await withUser(session.id, async (tx) => {
-      await tx.execute(sql`select public.delete_own_account()`)
+      await tx.execute(sql`select private.delete_own_account()`)
     })
     return null
   } catch {

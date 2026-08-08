@@ -7,6 +7,7 @@ import {
   type OnboardingError,
 } from '@/lib/dal/promise'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
+import { RATE_LIMITED_MESSAGE, withinRateLimit } from '@/lib/rate-limit'
 
 /**
  * `field` says which control the message belongs to, so the form can hand it
@@ -44,6 +45,14 @@ export async function completeOnboarding(
   formData: FormData,
 ): Promise<OnboardingState> {
   const session = await requireSessionUser()
+
+  // "This username is already taken" is a useful message and an enumeration
+  // oracle at the same time. It stays — the alternative is a form that refuses
+  // without saying why — and the budget is what makes reading it one name at a
+  // time the only way to use it.
+  if (!(await withinRateLimit('onboarding'))) {
+    return { error: RATE_LIMITED_MESSAGE, field: 'username' }
+  }
 
   const error = await createProfileAndPromise(session, {
     username: String(formData.get('username') ?? ''),
