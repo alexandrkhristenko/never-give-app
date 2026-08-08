@@ -1,0 +1,147 @@
+/*
+ * The only place NES.css is overridden. Everything here relies on globals.css
+ * importing NES.css into the `nes` layer, which sits below `components`.
+ */
+
+/*
+ * A panel is a thing sitting on the screen, not a region of it. The hard
+ * offset shadow is what says so — the same trick every sprite-era interface
+ * used to fake depth without a blur it could not compute.
+ */
+.nes-container {
+  padding: 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+  box-shadow: var(--shadow-pixel);
+}
+
+/*
+ * The title reads as a cartridge label: inverted, tight, sitting on the border
+ * rather than floating inside it.
+ */
+.nes-container.with-title > .title {
+  padding: 0.25rem 0.75rem;
+  color: var(--color-panel);
+  background-color: var(--color-edge);
+  box-shadow: var(--shadow-pixel-sm);
+}
+
+@media (width >= 40rem) {
+  .nes-container {
+    padding: 1.5rem 2rem;
+  }
+}
+
+.nes-btn {
+  /* WCAG target size. NES.css ships 6px/8px padding, which lands under 30px. */
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  cursor: pointer;
+  box-shadow: var(--shadow-pixel-sm);
+  transition: translate 80ms steps(2, end), box-shadow 80ms steps(2, end);
+}
+
+/*
+ * The press. The button travels into its own shadow, which is what a physical
+ * key does and what every console UI of the period imitated. Stepped rather
+ * than eased: sprites changed frames, they did not interpolate.
+ */
+.nes-btn:active {
+  translate: 2px 2px;
+  box-shadow: none;
+}
+
+.nes-btn.is-primary {
+  color: var(--color-panel);
+  background-color: var(--color-freeze);
+}
+
+.nes-btn.is-success {
+  color: var(--color-panel);
+  background-color: var(--color-streak);
+}
+
+/*
+ * Required, not optional. NES.css's own `.nes-btn.is-warning` now sits in the
+ * lower `nes` layer, and layer order beats specificity — without this rule the
+ * bare `.nes-btn` above wins and a warning button renders as a plain one.
+ */
+.nes-btn.is-warning {
+  color: var(--color-warning-ink);
+  background-color: var(--color-warning);
+}
+
+/*
+ * Destructive actions. Inverted rather than red, because red already means two
+ * other things in this interface — see the note on the `danger` variant.
+ *
+ * The colour pair needs no separate contrast measurement: it is ink against
+ * panel, the same pair the body text uses, swapped. Whatever the base text
+ * passes, this passes.
+ *
+ * Overriding NES.css's own `.nes-btn.is-error` for the reason `is-warning`
+ * documents: theirs sits in the lower `nes` layer, and layer order beats
+ * specificity.
+ */
+.nes-btn.is-error {
+  color: var(--color-panel);
+  background-color: var(--color-edge);
+}
+
+.nes-input,
+.nes-textarea,
+.nes-select select {
+  color: var(--color-ink);
+  background-color: var(--color-panel);
+  border-color: var(--color-edge);
+}
+
+/*
+ * NES.css replaces the system cursor with a base64 PNG on html and on every
+ * button. That overrides the user's cursor size and contrast settings, which
+ * some people depend on.
+ */
+html,
+.nes-btn,
+.nes-input,
+.nes-select select {
+  cursor: auto;
+}
+
+.nes-btn {
+  cursor: pointer;
+}
+
+/*
+ * NES.css colours every anchor #007bff from the `nes` layer, which fails AA on
+ * both surfaces in both themes. Anchors styled as buttons opt out — they carry
+ * their own foreground.
+ */
+a:not(.nes-btn) {
+  color: var(--color-link);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-streak);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    /*
+     * Delay too, not just duration. A staggered reveal fills `backwards`, so
+     * killing the duration alone would leave each panel invisible for the
+     * length of its delay — a blank screen for exactly the people who asked
+     * for less movement.
+     */
+    animation-delay: 0ms !important;
+  }
+}

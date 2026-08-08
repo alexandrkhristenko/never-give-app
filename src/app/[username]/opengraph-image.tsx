@@ -1,0 +1,154 @@
+import { ImageResponse } from 'next/og'
+import { notFound } from 'next/navigation'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { getPublicProfile } from '@/lib/dal/user'
+import { getPublicPromiseView } from '@/lib/dal/promise'
+import { buildChain, type Cell } from '@/lib/view/chain'
+
+export const alt = 'never-give.app streak'
+export const size = { width: 1200, height: 630 }
+export const contentType = 'image/png'
+// Bounds the URL space: without this, an unbounded username space each costs
+// two DB round trips plus a Satori render on every request.
+export const revalidate = 300
+
+const pressStart2P = await readFile(
+  join(process.cwd(), 'assets/PressStart2P-Regular.ttf'),
+)
+
+// Satori renders outside the document and cannot see the app's CSS variables,
+// so the light-theme palette is written out here.
+const INK = '#1a1d21'
+const MUTED = '#5b6169'
+const PANEL = '#ffffff'
+const BG = '#14171a'
+const CELL_COLOR: Record<Cell['state'], string> = {
+  checked: '#b3341c',
+  frozen: '#1c5f8f',
+  missed: '#b9bec4',
+  empty: '#dfe1e4',
+}
+
+const TITLE_MAX_GRAPHEMES = 45
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
+
+/**
+ * Satori has no line clamping, so a long title would push the streak out of
+ * frame. Cut by grapheme, not by `String.length`: a title is capped at 80 UTF-16
+ * units, so an emoji can straddle the cut point and a naive `slice` would leave
+ * a lone surrogate — a broken glyph in the one image strangers actually see.
+ */
+function truncate(title: string): string {
+  const units = [...graphemes.segment(title)].map((entry) => entry.segment)
+  if (units.length <= TITLE_MAX_GRAPHEMES) return title
+  return `${units.slice(0, TITLE_MAX_GRAPHEMES).join('')}...`
+}
+
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+
+  const profile = await getPublicProfile(username)
+  const promise = profile ? await getPublicPromiseView(profile) : null
+
+  // A private promise and a username nobody registered must be
+  // indistinguishable here, exactly as in `generateMetadata`. Rendering a
+  // fallback card for one and not the other would turn this route into an
+  // account-existence oracle. notFound() throws a control-flow exception, so
+  // it stays out of try/catch.
+  if (!profile || !promise) notFound()
+
+  const cells: Cell[] = buildChain({
+    today: promise.today,
+    checkinDates: promise.recentCheckins,
+    frozenDates: promise.recentFrozen,
+    startedOn: promise.startedOn,
+  })
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          backgroundColor: BG,
+          padding: 40,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: PANEL,
+            border: `8px solid ${INK}`,
+            width: '100%',
+            height: '100%',
+            padding: 60,
+          }}
+        >
+          <div style={{ fontSize: 36, color: INK }}>{profile.username}</div>
+          <div style={{ fontSize: 18, color: MUTED, marginTop: 24 }}>
+            is committing to
+          </div>
+          <div
+            style={{
+              fontSize: 34,
+              color: INK,
+              marginTop: 28,
+              textAlign: 'center',
+              maxWidth: 940,
+            }}
+          >
+            {truncate(promise.title)}
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 44 }}>
+            {cells.map((cell) => (
+              <div
+                key={cell.date}
+                style={{
+                  width: 26,
+                  height: 26,
+                  backgroundColor: CELL_COLOR[cell.state],
+                  border: `3px solid ${INK}`,
+                }}
+              />
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              marginTop: 44,
+            }}
+          >
+            <span style={{ fontSize: 16, color: MUTED }}>CURRENT STREAK</span>
+            <span style={{ fontSize: 88, color: CELL_COLOR.checked, marginTop: 16 }}>
+              {promise.currentStreak}
+            </span>
+          </div>
+        </div>
+      </div>
+    ),
+    {
+      ...size,
+      fonts: [
+        {
+          name: 'Press Start 2P',
+          data: pressStart2P,
+          style: 'normal',
+          weight: 400,
+        },
+      ],
+    },
+  )
+}

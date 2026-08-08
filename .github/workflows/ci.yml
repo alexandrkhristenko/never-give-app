@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the older run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Ordered cheapest first, so an obvious break reports in seconds rather
+      # than after a full build.
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # The build is the only step that would catch a broken cascade layer or a
+      # server/client boundary violation, so it runs even though it is slow.
+      - name: Build
+        run: npm run build
+        env:
+          # Present only so the build can resolve them; no secret is needed to
+          # compile, and nothing here reaches a real project.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      - name: Production dependencies have no known vulnerabilities
+        run: npm audit --omit=dev --audit-level=low
+
+# Deliberately not here:
+#
+# `npm run test:db` needs DATABASE_URL and `npm run test:e2e` needs
+# SUPABASE_SERVICE_ROLE_KEY. Both talk to the one shared Supabase project, so
+# running them from CI would let concurrent runs corrupt each other's fixtures
+# and would put a service-role key in the workflow environment. They belong in
+# a job with its own throwaway database, which does not exist yet.

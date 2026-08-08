@@ -892,7 +892,7 @@ export function validatePromiseTitle(title: string): PromiseTitleError | null {
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
 Run: `npm test`
-Expected: PASS — 48 тестов.
+Expected: PASS — 49 тестов (48 из этой задачи плюс регрессионный тест на «заморозка одна продлевает стрик», добавленный в задаче 3).
 
 - [ ] **Step 5: Коммит**
 
@@ -1230,7 +1230,7 @@ export function daysToNextStage(currentStreak: number): number | null {
 - [ ] **Step 8: Убедиться, что все тесты проходят**
 
 Run: `npm test`
-Expected: PASS — 73 теста.
+Expected: PASS — 74 теста.
 
 - [ ] **Step 9: Коммит**
 
@@ -1915,7 +1915,7 @@ git commit -m "feat: add data access layer for session and profile"
   - `getOwnPromiseView(profile: Profile, now?: Date): Promise<PromiseView | null>`
   - `getPublicPromiseView(profile: PublicProfile, now?: Date): Promise<PublicPromiseView | null>`
   - `interface CheckInResult { alreadyCheckedIn: boolean; earnedFreeze: boolean }`
-  - `checkIn(profile: Profile, now?: Date): Promise<CheckInResult>`
+  - `checkIn(profile: Profile, now?: Date): Promise<CheckInResult | null>` — `null` означает «обещания нет», а не «отметка прошла»
   - `createProfileAndPromise(...)` — см. задачу 11
 
 **Контекст.** Порядок операций задан [docs/product-spec.md §4.7](../../product-spec.md):
@@ -1928,7 +1928,9 @@ git commit -m "feat: add data access layer for session and profile"
 
 Публичный профиль не пишет в БД намеренно: анонимный посетитель не должен провоцировать мутации. Следствие зафиксировано в [known-issues.md §2.1](../../known-issues.md).
 
-Списание заморозок и декремент баланса идут в одной транзакции, поэтому расхождение между журналом `streak_freezes` и `users.streak_freezes_balance` невозможно.
+Списание заморозок и декремент баланса идут в одной транзакции — но **одной атомарности мало**. При уровне изоляции READ COMMITTED параллельная транзакция не видна, поэтому баланс нельзя брать из снимка профиля, сделанного раньше и в другой транзакции: загрузка дашборда, идущая наперегонки с чек-ином, молча затрёт заработанную заморозку. Ни одно ограничение это не поймает — все ошибочные значения остаются внутри диапазона `0..3`, а уникальность `(promise_id, local_date)` лишь заставляет устаревшего писателя коммитить последним.
+
+Поэтому `applyPendingFreezes` читает баланс **внутри своей транзакции** и блокирует строку через `select ... for update` до планирования. Блокировка сериализует дашборд и чек-ин с первого же запроса и закрывает обе стороны: и потерю начисления, и показ устаревшего числа на экране.
 
 Оба DTO отдают не только числа стриков, но и **даты внутри окна цепочки** плюс `startedOn`. Без них экран не построит ленту дней, а без `startedOn` не отличит «пропустил» от «меня тогда ещё не было» (задача 4a). Даты режутся окном прямо здесь, а не на странице: DTO обязан оставаться минимальным ([architecture.md §5](../../architecture.md)), и отдавать наружу 365 записей ради тридцати клеток незачем.
 
@@ -2188,8 +2190,14 @@ export async function checkIn(
 /**
  * The public view of a promise. Read-only on purpose: an anonymous visitor
  * must never trigger a write, so due freezes are not spent here.
+ *
+ * Memoised per render like `getPublicProfile`: the profile page queries it
+ * from both `generateMetadata` and the page body, which run separately. Without
+ * this the page issues two independent transactions and the two can observe
+ * different data — a promise flipped to private between them would still be
+ * described in the <title> tag.
  */
-export async function getPublicPromiseView(
+export const getPublicPromiseView = cache(async function getPublicPromiseView(
   profile: PublicProfile,
   now: Date = new Date(),
 ): Promise<PublicPromiseView | null> {
@@ -2220,7 +2228,13 @@ export async function getPublicPromiseView(
       recentFrozen: withinChainWindow(frozenDates, today),
     }
   })
-}
+})
+```
+
+Добавить в импорты в начале файла:
+
+```ts
+import { cache } from 'react'
 ```
 
 - [ ] **Step 2: Проверить компиляцию**
@@ -2318,6 +2332,13 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
   --color-freeze: light-dark(#1c5f8f, #5cb8e8);
   --color-miss: light-dark(#b9bec4, #3a4148);
   --color-empty: light-dark(#dfe1e4, #2a3036);
+
+  /*
+   * Amber is light in both themes, so its text stays dark either way and the
+   * ink token does not flip. Contrast against it: 7.8:1 light, 6.6:1 dark.
+   */
+  --color-warning: light-dark(#e8a317, #d99414);
+  --color-warning-ink: #1a1d21;
 }
 
 @layer base {
@@ -2495,6 +2516,16 @@ grep -o "\.nes-btn{[^}]*}" node_modules/nes.css/css/nes.min.css | grep -o "backg
 .nes-btn.is-success {
   color: var(--color-panel);
   background-color: var(--color-streak);
+}
+
+/*
+ * Required, not optional. NES.css's own `.nes-btn.is-warning` now sits in the
+ * lower `nes` layer, and layer order beats specificity — without this rule the
+ * bare `.nes-btn` above wins and a warning button renders as a plain one.
+ */
+.nes-btn.is-warning {
+  color: var(--color-warning-ink);
+  background-color: var(--color-warning);
 }
 
 .nes-input,
@@ -2764,7 +2795,7 @@ export default function Field({
 ```tsx
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useSyncExternalStore, useTransition } from 'react'
 import { setTheme } from '@/app/theme-actions'
 
 // Declared locally on purpose. `src/lib/theme.ts` is marked `server-only`, so
@@ -2772,21 +2803,37 @@ import { setTheme } from '@/app/theme-actions'
 // bundle and fail the build.
 type Theme = 'light' | 'dark'
 
+const PREFERS_DARK = '(prefers-color-scheme: dark)'
+
+function subscribe(onChange: () => void) {
+  const query = window.matchMedia(PREFERS_DARK)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
+/**
+ * What the operating system asks for.
+ *
+ * Only the browser can answer, so the server snapshot is `null`.
+ * `useSyncExternalStore` is the sanctioned way to read a browser API during
+ * render: writing this as `useState` seeded by a `useEffect` sets state
+ * synchronously inside an effect, which triggers cascading renders and is a
+ * lint error.
+ */
+function useSystemTheme(): Theme | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => (window.matchMedia(PREFERS_DARK).matches ? 'dark' : 'light'),
+    () => null,
+  )
+}
+
 export default function ThemeToggle({ stored }: { stored: Theme | null }) {
-  const [effective, setEffective] = useState<Theme | null>(stored)
+  const system = useSystemTheme()
   const [pending, startTransition] = useTransition()
 
-  useEffect(() => {
-    // With no cookie the media query decides what is actually on screen, and
-    // only the browser knows that.
-    if (stored) return
-    setEffective(
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light',
-    )
-  }, [stored])
-
+  // An explicit choice wins; otherwise the media query decides.
+  const effective = stored ?? system
   const next: Theme = effective === 'dark' ? 'light' : 'dark'
 
   return (
@@ -2795,15 +2842,15 @@ export default function ThemeToggle({ stored }: { stored: Theme | null }) {
       className="nes-btn"
       aria-label={`Switch to ${next} theme`}
       aria-busy={pending}
-      onClick={() => {
-        setEffective(next)
-        startTransition(() => setTheme(next))
-      }}
+      onClick={() => startTransition(() => setTheme(next))}
     >
       {next === 'dark' ? 'DARK' : 'LIGHT'}
     </button>
   )
 }
+```
+
+Локального состояния нет вовсе: `setTheme` вызывает `revalidatePath('/', 'layout')`, корневой layout перечитывает куку и передаёт новое значение пропом `stored`. Держать копию в `useState` означало бы иметь два источника правды.
 ```
 
 - [ ] **Step 6: Проверить компиляцию**
@@ -3174,7 +3221,10 @@ export default function AppHeader({ username, theme }: AppHeaderProps) {
 
       <div className="flex items-center gap-2">
         {username ? (
-          <span className="hidden font-mono text-xs text-ink-muted sm:inline">
+          // min-w-0 + truncate: the username is user-controlled and this row
+          // does not wrap, so without them a long one widens the header past
+          // its container.
+          <span className="hidden min-w-0 truncate font-mono text-xs text-ink-muted sm:inline">
             @{username}
           </span>
         ) : null}
@@ -3332,6 +3382,12 @@ export async function checkInAction(
 
   try {
     const result = await checkIn(profile)
+
+    // null means there is no promise to check in on. Reporting success here
+    // would render DONE FOR TODAY over an operation that wrote nothing.
+    if (!result) {
+      return { status: 'error', message: 'No active quest to check in on.' }
+    }
 
     revalidatePath('/dashboard')
     revalidatePath(`/${profile.username}`)
@@ -3598,7 +3654,8 @@ git commit -m "fix: rebuild dashboard on the data access layer"
 - Produces:
   - `createProfileAndPromise(session: SessionUser, input: OnboardingInput): Promise<OnboardingError | null>` в `src/lib/dal/promise.ts`
   - `type OnboardingError = 'invalid_username' | 'reserved_username' | 'username_taken' | 'empty_promise' | 'promise_too_long' | 'unknown'`
-  - `interface OnboardingState { error?: string }`
+  - `type OnboardingField = 'username' | 'promise'`
+  - `interface OnboardingState { error?: string; field?: OnboardingField }` — `field` привязывает сообщение к конкретному контролу
   - `completeOnboarding(prevState: OnboardingState, formData: FormData): Promise<OnboardingState>`
 
 **Контекст.** Чинятся дефекты 1.4 и 1.5 из [known-issues.md](../../known-issues.md). Сейчас занятый username даёт `catch` → `return`, и форма молча ничего не делает. Плюс апсерт идёт с целью конфликта `email` вместо `id`, из-за чего `users.id` может разойтись с `auth.users.id` и сломать все политики RLS.
@@ -3728,8 +3785,25 @@ import {
 } from '@/lib/dal/promise'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
 
+/**
+ * `field` says which control the message belongs to, so the form can hand it
+ * to that `Field` and mark the control invalid. Without it a screen-reader
+ * user tabbing field by field never learns *which* input was rejected.
+ */
+export type OnboardingField = 'username' | 'promise'
+
 export interface OnboardingState {
   error?: string
+  field?: OnboardingField
+}
+
+const FIELDS: Record<OnboardingError, OnboardingField | undefined> = {
+  invalid_username: 'username',
+  reserved_username: 'username',
+  username_taken: 'username',
+  empty_promise: 'promise',
+  promise_too_long: 'promise',
+  unknown: undefined,
 }
 
 const MESSAGES: Record<OnboardingError, string> = {
@@ -3755,7 +3829,7 @@ export async function completeOnboarding(
     timezone: String(formData.get('timezone') || 'UTC'),
   })
 
-  if (error) return { error: MESSAGES[error] }
+  if (error) return { error: MESSAGES[error], field: FIELDS[error] }
 
   // Outside any try/catch: redirect() throws a control-flow exception.
   redirect('/dashboard')
@@ -3773,7 +3847,11 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import Field from '@/components/ui/field'
 import PixelButton from '@/components/ui/pixel-button'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
-import { completeOnboarding, type OnboardingState } from './actions'
+import {
+  completeOnboarding,
+  type OnboardingField,
+  type OnboardingState,
+} from './actions'
 
 const INITIAL_STATE: OnboardingState = {}
 
@@ -3793,9 +3871,16 @@ export default function OnboardingForm() {
     }
   }, [])
 
+  // A field-scoped error goes to that Field; anything unattributable (a
+  // database failure) stays a form-level message.
+  const errorFor = (field: OnboardingField) =>
+    state.field === field ? state.error : undefined
+  const describedBy = (field: OnboardingField) =>
+    state.field === field ? `${field}-hint ${field}-error` : `${field}-hint`
+
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.error ? (
+      {state.error && !state.field ? (
         <p role="alert" className="font-mono text-xs text-streak">
           {state.error}
         </p>
@@ -3805,6 +3890,7 @@ export default function OnboardingForm() {
         id="username"
         label="Choose a username"
         hint={`never-give.app/${username || 'username'}`}
+        error={errorFor('username')}
       >
         <input
           type="text"
@@ -3817,7 +3903,8 @@ export default function OnboardingForm() {
           pattern="[a-zA-Z0-9_]+"
           autoComplete="off"
           title="Letters, digits and underscores, 3-20 characters"
-          aria-describedby="username-hint"
+          aria-describedby={describedBy('username')}
+          aria-invalid={state.field === 'username' || undefined}
           value={username}
           onChange={(event) => setUsername(event.target.value)}
         />
@@ -3827,6 +3914,7 @@ export default function OnboardingForm() {
         id="promise"
         label="Your main promise"
         hint={`${promiseLength} / ${PROMISE_MAX_LENGTH}`}
+        error={errorFor('promise')}
       >
         <input
           type="text"
@@ -3836,7 +3924,8 @@ export default function OnboardingForm() {
           placeholder="e.g. Code every day"
           required
           maxLength={PROMISE_MAX_LENGTH}
-          aria-describedby="promise-hint"
+          aria-describedby={describedBy('promise')}
+          aria-invalid={state.field === 'promise' || undefined}
           onChange={(event) => setPromiseLength(event.target.value.length)}
         />
       </Field>
@@ -4001,24 +4090,31 @@ interface PageProps {
   params: Promise<{ username: string }>
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://never-give.app'
+// Same fallback as `src/app/login/actions.ts` and README §Переменные: an unset
+// variable means local development, so the share button must copy a localhost
+// URL rather than a production one that may resolve to somebody else's account.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params
 
   const profile = await getPublicProfile(username)
-  if (!profile) return { title: 'Player not found - never-give.app' }
+  const promise = profile ? await getPublicPromiseView(profile) : null
 
-  const promise = await getPublicPromiseView(profile)
+  // A private promise and a username nobody registered must be
+  // indistinguishable here, exactly as they are in the page body. Returning a
+  // profile-shaped title for one and a generic one for the other would turn
+  // the <title> tag into an account-existence oracle.
+  if (!profile || !promise) {
+    return { title: 'Player not found - never-give.app' }
+  }
 
   return {
     title: `${profile.username}'s Streak - never-give.app`,
-    description: promise
-      ? `${profile.username} is committing to: ${promise.title}`
-      : `Follow ${profile.username}'s journey.`,
+    description: `${profile.username} is committing to: ${promise.title}`,
     // Unlisted profiles are reachable by link but must stay out of search.
     robots:
-      promise?.visibility === 'unlisted'
+      promise.visibility === 'unlisted'
         ? { index: false, follow: false }
         : undefined,
   }
@@ -4203,6 +4299,21 @@ const CELL_COLOR: Record<Cell['state'], string> = {
   empty: '#dfe1e4',
 }
 
+const TITLE_MAX_GRAPHEMES = 45
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
+
+/**
+ * Satori has no line clamping, so a long title would push the streak out of
+ * frame. Cut by grapheme, not by `String.length`: a title is capped at 80 UTF-16
+ * units, so an emoji can straddle the cut point and a naive `slice` would leave
+ * a lone surrogate — a broken glyph in the one image strangers actually see.
+ */
+function truncate(title: string): string {
+  const units = [...graphemes.segment(title)].map((entry) => entry.segment)
+  if (units.length <= TITLE_MAX_GRAPHEMES) return title
+  return `${units.slice(0, TITLE_MAX_GRAPHEMES).join('')}...`
+}
+
 export default async function Image({
   params,
 }: {
@@ -4260,12 +4371,10 @@ export default async function Image({
               color: INK,
               marginTop: 28,
               textAlign: 'center',
-              // Satori has no line clamping, so keep long titles from
-              // pushing the streak out of frame.
               maxWidth: 940,
             }}
           >
-            {title.length > 48 ? `${title.slice(0, 45)}...` : title}
+            {truncate(title)}
           </div>
 
           <div style={{ display: 'flex', gap: 6, marginTop: 44 }}>
@@ -4389,13 +4498,16 @@ const DEMO_CHAIN = buildChain({
   startedOn: DEMO_START,
 })
 
+const FREEZE_START = '2026-08-01'
+const FREEZE_GAP = '2026-08-06'
+
 const FREEZE_DEMO = buildChain({
-  today: '2026-08-10',
-  checkinDates: datesBetween('2026-08-01', '2026-08-10').filter(
-    (date) => date !== '2026-08-06',
+  today: DEMO_TODAY,
+  checkinDates: datesBetween(FREEZE_START, DEMO_TODAY).filter(
+    (date) => date !== FREEZE_GAP,
   ),
-  frozenDates: ['2026-08-06'],
-  startedOn: '2026-08-01',
+  frozenDates: [FREEZE_GAP],
+  startedOn: FREEZE_START,
   days: 10,
 })
 
@@ -4509,9 +4621,16 @@ import Field from '@/components/ui/field'
 import PixelButton from '@/components/ui/pixel-button'
 import { login, signup } from './actions'
 
+type LoginMode = 'login' | 'signup'
+
+/**
+ * An error carries the mode it came from. Without that, failing a sign-in and
+ * then switching to sign-up leaves the old message on screen describing a flow
+ * the user is no longer in.
+ */
 type LoginState =
   | { status: 'idle' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; mode: LoginMode }
   | { status: 'check_email' }
 
 const INITIAL_STATE: LoginState = { status: 'idle' }
@@ -4523,15 +4642,21 @@ export default function LoginForm() {
   // their signatures stay untouched.
   const [state, action, pending] = useActionState(
     async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
+      const mode: LoginMode = isLogin ? 'login' : 'signup'
+
       if (isLogin) {
+        // On success login() redirects, which throws a control-flow exception,
+        // so nothing after this await runs and the component unmounts.
         const result = await login(formData)
         return result?.error
-          ? { status: 'error', message: result.error }
+          ? { status: 'error', message: result.error, mode }
           : { status: 'idle' }
       }
 
       const result = await signup(formData)
-      if (result?.error) return { status: 'error', message: result.error }
+      if (result?.error) {
+        return { status: 'error', message: result.error, mode }
+      }
       return { status: 'check_email' }
     },
     INITIAL_STATE,
@@ -4553,7 +4678,8 @@ export default function LoginForm() {
 
   return (
     <form action={action} className="flex flex-col gap-6">
-      {state.status === 'error' ? (
+      {state.status === 'error' &&
+      state.mode === (isLogin ? 'login' : 'signup') ? (
         <p role="alert" className="font-mono text-xs text-streak">
           {state.message}
         </p>
@@ -4695,16 +4821,27 @@ export default function DashboardLoading() {
     >
       <Block className="h-11 w-full" />
 
+      {/* One block per element the real page renders, in the same order and
+          at the same height. A skeleton that omits the largest block — the
+          chain — produces the layout jump it exists to prevent. */}
       <Panel title="ACTIVE QUEST" className="flex flex-col items-center gap-6">
         <Block className="h-6 w-3/4" />
         <Block className="h-16 w-14 sm:h-24 sm:w-[5.25rem]" />
+        <Block className="h-3 w-48" />
         <div className="grid w-full grid-cols-2 gap-4">
           <Block className="h-16 w-full" />
           <Block className="h-16 w-full" />
         </div>
         <Block className="h-11 w-full" />
-        <Block className="h-4 w-full" />
+        <div className="flex w-full flex-col gap-2">
+          <Block className="h-4 w-full" />
+          <Block className="h-3 w-2/3" />
+        </div>
+        <Block className="h-3 w-32" />
       </Panel>
+
+      {/* The "view public profile" link sits below the panel on the real page. */}
+      <Block className="mx-auto h-3 w-40" />
     </main>
   )
 }
@@ -4732,14 +4869,25 @@ export default function ProfileLoading() {
 
       <Panel className="flex flex-col items-center gap-6">
         <Block className="h-6 w-40" />
+        <Block className="h-3 w-32" />
         <Block className="h-6 w-3/4" />
         <Block className="h-16 w-14 sm:h-24 sm:w-[5.25rem]" />
+        <Block className="h-3 w-48" />
         <div className="grid w-full grid-cols-2 gap-4">
           <Block className="h-16 w-full" />
           <Block className="h-16 w-full" />
         </div>
-        <Block className="h-4 w-full" />
+        <div className="flex w-full flex-col gap-2">
+          <Block className="h-4 w-full" />
+          <Block className="h-3 w-2/3" />
+        </div>
+        <Block className="h-3 w-32" />
       </Panel>
+
+      {/* The share bar and the call to action sit outside the panel on the
+          real page, and both have visible height. */}
+      <Block className="h-11 w-full" />
+      <Block className="mx-auto h-11 w-48" />
     </main>
   )
 }
@@ -4940,6 +5088,9 @@ export { expect } from '@playwright/test'
 ```ts
 import { expect, test } from './fixtures'
 
+/** Same widths the layout suite uses, so the two agree on what "narrow" means. */
+const VIEWPORTS = [320, 375, 768, 1280]
+
 async function signIn(page: import('@playwright/test').Page, user: { email: string; password: string }) {
   await page.goto('/login')
   await page.getByLabel('Email').fill(user.email)
@@ -4967,9 +5118,25 @@ test('a new player onboards, checks in, and shows up publicly', async ({
 
   await expect(page.getByTestId('current-streak')).toHaveText('1')
   await expect(page.getByTestId('best-streak')).toHaveText('1')
-  await expect(
-    page.getByRole('button', { name: 'DONE FOR TODAY' }),
-  ).toBeDisabled()
+
+  // Not a disabled button: once there is nothing to do the form renders a
+  // status element instead, so that a keyboard user is not handed a control
+  // that cannot be focused and explains nothing.
+  await expect(page.getByRole('status')).toContainText('DONE FOR TODAY')
+
+  // The design spec wants the horizontal-overflow check on the dashboard and
+  // the public profile as well as the landing page. Those two need a session
+  // and a seeded user, so they are asserted here rather than in the
+  // session-free layout suite.
+  for (const width of VIEWPORTS) {
+    await page.setViewportSize({ width, height: 800 })
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    )
+    expect(overflow, `dashboard at ${width}px`).toBeLessThanOrEqual(0)
+  }
+  await page.setViewportSize({ width: 1280, height: 800 })
 
   // The public page must show the same streak to a visitor with no session.
   const visitor = await page.context().browser()!.newContext()
@@ -4980,6 +5147,15 @@ test('a new player onboards, checks in, and shows up publicly', async ({
     visitorPage.getByRole('heading', { name: user.username }),
   ).toBeVisible()
   await expect(visitorPage.getByTestId('current-streak')).toHaveText('1')
+
+  for (const width of VIEWPORTS) {
+    await visitorPage.setViewportSize({ width, height: 800 })
+    const overflow = await visitorPage.evaluate(
+      () => document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    )
+    expect(overflow, `public profile at ${width}px`).toBeLessThanOrEqual(0)
+  }
 
   await visitor.close()
 })
