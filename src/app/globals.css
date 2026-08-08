@@ -44,6 +44,29 @@
    * change to one silently restyling the other.
    */
   --color-link: light-dark(#1c5f8f, #5cb8e8);
+
+  /*
+   * The console, not the page.
+   *
+   * A pixel font on flat white is a wireframe in costume. What actually made
+   * these interfaces recognisable was the hardware: a shadow-mask tube, a
+   * palette too small for gradients, and sprites that snapped between frames
+   * instead of easing. These four tokens carry that and nothing else does, so
+   * the whole look can be retuned from here.
+   */
+
+  /* Hard offset shadow. No blur — blur is a post-2000 idea. */
+  --shadow-pixel: 4px 4px 0 0 var(--color-edge);
+  --shadow-pixel-sm: 2px 2px 0 0 var(--color-edge);
+
+  /* Same idea for glyphs, where box-shadow does not reach. */
+  --shadow-pixel-text: 3px 3px 0 color-mix(in srgb, var(--color-edge) 22%, transparent);
+
+  /* The tube. Barely there in light, more present against a dark screen. */
+  --scanline: light-dark(rgb(26 29 33 / 6%), rgb(242 244 246 / 5%));
+
+  /* Dither, the era's answer to a gradient it could not afford. */
+  --dither: light-dark(rgb(26 29 33 / 6%), rgb(242 244 246 / 5%));
 }
 
 @layer base {
@@ -64,12 +87,70 @@
     color-scheme: dark;
   }
 
+  /*
+   * The screen itself: a scanline pass and a dither checkerboard, painted on
+   * the body's own background rather than as an overlay.
+   *
+   * The overlay version looked more like a real tube — a veil covers the
+   * panels too — but it also sat on top of the text and genuinely dimmed it.
+   * Measured: white-on-panel fell from 13.7:1 to 2.2:1 in the dark theme. The
+   * accessibility audit caught it, and it was right to; that is not a
+   * rendering artefact, it is unreadable text. Behind the content the texture
+   * costs nothing and reads as the surface the panels are resting on.
+   *
+   * Two repeating gradients, no image, no request.
+   */
   body {
     font-family: var(--font-pixel);
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        var(--scanline) 0 1px,
+        transparent 1px 4px
+      ),
+      repeating-conic-gradient(var(--dither) 0% 25%, transparent 0% 50%);
+    background-size:
+      100% 4px,
+      6px 6px;
+    background-attachment: fixed;
   }
 }
 
 @layer components {
+  /*
+   * Page load, once. Panels snap in from below in sequence — stepped, so it
+   * reads as frames advancing rather than a modern ease. One orchestrated
+   * entrance is worth more than a dozen scattered hovers, and it is the only
+   * moment the whole screen is looked at at once.
+   */
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  main > * {
+    animation: panel-in 240ms steps(4, end) backwards;
+  }
+
+  main > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  main > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+  main > :nth-child(4) {
+    animation-delay: 180ms;
+  }
+  main > :nth-child(n + 5) {
+    animation-delay: 240ms;
+  }
+
   /*
    * The chain. Both the column count and which cells get trimmed come from
    * the component, so CHAIN_DAYS and CHAIN_DAYS_COMPACT stay the single
@@ -89,6 +170,11 @@
     grid-template-columns: repeat(var(--chain-n), minmax(0, 1.25rem));
     justify-content: space-between;
     gap: 2px;
+  }
+
+  /* Today, whatever its state, is the one cell worth finding at a glance. */
+  .chain > li[data-today] {
+    box-shadow: var(--shadow-pixel-sm);
   }
 
   .chain > li[data-trimmed] {

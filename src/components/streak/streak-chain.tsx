@@ -6,11 +6,21 @@ import {
   type Cell,
 } from '@/lib/view/chain'
 
+/*
+ * Weight follows meaning. With one border colour for every cell, the untouched
+ * days read as bright outlines on a dark screen and the earned ones vanished
+ * between them — the chain advertised its gaps instead of its length. Days that
+ * happened keep the full edge; days that did not recede toward the panel.
+ *
+ * The border lives here rather than in a stylesheet because `border-edge` is a
+ * Tailwind utility, and the utilities layer outranks the components layer no
+ * matter how specific the selector.
+ */
 const STATE_CLASS: Record<Cell['state'], string> = {
-  checked: 'bg-streak',
-  frozen: 'bg-freeze',
-  missed: 'bg-miss',
-  empty: 'bg-empty',
+  checked: 'bg-streak border-edge',
+  frozen: 'bg-freeze border-edge',
+  missed: 'bg-miss border-edge/30',
+  empty: 'bg-empty border-edge/30',
 }
 
 export default function StreakChain({ cells }: { cells: Cell[] }) {
@@ -53,7 +63,7 @@ export default function StreakChain({ cells }: { cells: Cell[] }) {
                 : undefined
             }
             data-today={cell.date === lastDate ? '' : undefined}
-            className={`aspect-square border-2 border-edge ${STATE_CLASS[cell.state]}`}
+            className={`aspect-square border-2 ${STATE_CLASS[cell.state]}`}
           />
         ))}
       </ol>

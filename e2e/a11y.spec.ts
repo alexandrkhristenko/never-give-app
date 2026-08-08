@@ -14,6 +14,32 @@ import { expect, test } from '@playwright/test'
  * reader's output is useful. It catches the things that are simply wrong.
  */
 
+/**
+ * Waits for the entrance animation to finish before measuring.
+ *
+ * Panels fade in over 240ms, so an audit that fires on load samples text at
+ * partial opacity and reports a contrast failure for a frame that no one is
+ * asked to read. Verified deliberately: the same page reports one violation
+ * immediately and none once animations settle. Measuring a transition tells
+ * you about the transition, not the interface.
+ *
+ * Users who asked for less motion never see this state at all — the global
+ * reduced-motion rule zeroes both duration and delay.
+ *
+ * Looping animations are excluded rather than waited on: the avatar hops
+ * forever by design, so "every animation has finished" is a condition the
+ * profile page never satisfies. Waiting on it hangs instead of failing, which
+ * is the worse of the two.
+ */
+async function settled(page: import('@playwright/test').Page) {
+  await page.waitForFunction(() =>
+    document.getAnimations().every((animation) => {
+      const iterations = animation.effect?.getComputedTiming().iterations
+      return iterations === Infinity || animation.playState === 'finished'
+    }),
+  )
+}
+
 const PAGES = [
   { name: 'landing', path: '/' },
   { name: 'sign-in', path: '/login' },
@@ -35,6 +61,7 @@ for (const { name, path } of PAGES) {
         ])
         await page.setViewportSize({ width, height: 900 })
         await page.goto(path)
+        await settled(page)
 
         const results = await new AxeBuilder({ page })
           .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -59,6 +86,7 @@ test('the chain is announced as one image, not thirty list items', async ({
   page,
 }) => {
   await page.goto('/')
+  await settled(page)
 
   const chain = page.locator('[data-testid="chain"]').first()
   await expect(chain).toHaveAttribute('role', 'img')
@@ -75,6 +103,7 @@ test('the chain is announced as one image, not thirty list items', async ({
 test('every page has exactly one main landmark and one h1', async ({ page }) => {
   for (const { path } of PAGES) {
     await page.goto(path)
+    await settled(page)
     await expect(page.locator('main'), `${path} main`).toHaveCount(1)
     // A page whose heading is its logo tells a screen-reader user nothing about
     // where they are.
@@ -85,6 +114,7 @@ test('every page has exactly one main landmark and one h1', async ({ page }) => 
 
 test('interactive elements take focus and show it', async ({ page }) => {
   await page.goto('/login')
+  await settled(page)
 
   await page.keyboard.press('Tab')
   const focused = page.locator(':focus-visible')

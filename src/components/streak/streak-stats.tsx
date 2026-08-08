@@ -1,4 +1,10 @@
-const NUMBER_CLASS = 'leading-none [font-size:clamp(1.75rem,10vw,3.5rem)]'
+/*
+ * The count is the only thing on this screen anyone came to see, so it gets a
+ * hard offset shadow — the trick the era used to lift a sprite off a
+ * background without a blur it could not afford.
+ */
+const NUMBER_CLASS =
+  'leading-none [font-size:clamp(1.75rem,10vw,3.5rem)] [text-shadow:var(--shadow-pixel-text)]'
 
 interface StreakStatsProps {
   current: number
