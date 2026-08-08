@@ -70,7 +70,15 @@
    */
   .chain {
     display: grid;
-    grid-template-columns: repeat(var(--chain-n), minmax(0, 1fr));
+    /*
+     * `minmax(0, 1.25rem)` rather than `1fr`: a fractional track makes a cell's
+     * size depend on how many there are, so the ten-day illustration on the
+     * landing page rendered at three times the size of the real chain right
+     * below it. Capping the track keeps a cell the same size at any length,
+     * and the lower bound of 0 still lets it shrink when space is tight.
+     */
+    grid-template-columns: repeat(var(--chain-n), minmax(0, 1.25rem));
+    justify-content: space-between;
     gap: 2px;
   }
 
@@ -80,7 +88,7 @@
 
   @media (width >= 40rem) {
     .chain {
-      grid-template-columns: repeat(var(--chain-n-sm), minmax(0, 1fr));
+      grid-template-columns: repeat(var(--chain-n-sm), minmax(0, 1.25rem));
       gap: 4px;
     }
 
