@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   PROMISE_MAX_LENGTH,
@@ -68,5 +70,31 @@ describe('validateUsername', () => {
   it('rejects reserved names regardless of case', () => {
     expect(validateUsername('Dashboard')).toBe('reserved')
     expect(validateUsername('ADMIN')).toBe('reserved')
+  })
+})
+
+describe('RESERVED_USERNAMES coverage', () => {
+  it('reserves every top-level route segment that exists', () => {
+    // The invariant worth testing is not that the list contains thirteen
+    // particular strings — that only restates the literal. It is that the list
+    // still covers the app's own routes: add a page and forget the list, and a
+    // username registered earlier silently shadows it.
+    const appDir = join(process.cwd(), 'src', 'app')
+    const segments = readdirSync(appDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      // Dynamic segments cannot collide — `[username]` is the profile itself.
+      .filter((entry) => !entry.name.startsWith('[') && !entry.name.startsWith('('))
+      .map((entry) => entry.name)
+
+    expect(segments.length).toBeGreaterThan(0)
+    for (const segment of segments) {
+      expect(validateUsername(segment)).toBe('reserved')
+    }
+  })
+
+  it('reserves the framework asset path', () => {
+    // `_next` passes the username pattern, so nothing but this list stops a
+    // profile from claiming the path Next serves its own assets from.
+    expect(validateUsername('_next')).toBe('reserved')
   })
 })
