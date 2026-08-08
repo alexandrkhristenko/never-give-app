@@ -36,6 +36,13 @@
       "when": 1786045421738,
       "tag": "0004_timestamps_with_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786045422738,
+      "tag": "0005_touch_updated_at",
+      "breakpoints": true
     }
   ]
 }
