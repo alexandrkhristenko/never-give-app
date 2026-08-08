@@ -427,6 +427,12 @@ export async function createProfileAndPromise(
       // leaves the schema open to multiple promises as a roadmap item, so no
       // unique index exists. Without this check, a double-click on "START
       // GAME" or a replayed POST would insert a second (or Nth) promise row.
+      // Load-bearing ordering: the users upsert above must come first. Two
+      // concurrent submissions both write that row, so the second blocks on
+      // its lock and only then re-reads — under READ COMMITTED it therefore
+      // sees the first transaction's committed promise and skips its own
+      // insert. Verified against a live database with two connections.
+      // Swapping these two statements silently breaks the guarantee.
       const existing = await selectPrimaryPromise(tx, session.id)
       if (!existing) {
         await tx.insert(promises).values({
