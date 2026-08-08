@@ -1,4 +1,9 @@
-import { expect, test } from './fixtures'
+import { expect, hasAdminAccess, missingKeyReason, test } from './fixtures'
+
+// Without the service-role key there is no way to create a test account, so
+// these skip rather than fail — and say why, so the gap is visible in the
+// report instead of looking like a passing run.
+test.skip(!hasAdminAccess, missingKeyReason)
 
 /** Same widths the layout suite uses, so the two agree on what "narrow" means. */
 const VIEWPORTS = [320, 375, 768, 1280]
@@ -97,8 +102,3 @@ test('a reserved username is reported instead of failing silently', async ({
   await expect(page).toHaveURL('/onboarding')
 })
 
-test('an unknown profile returns the 404 page', async ({ page }) => {
-  await page.goto('/nosuchplayer')
-
-  await expect(page.getByText('No player found at this address.')).toBeVisible()
-})

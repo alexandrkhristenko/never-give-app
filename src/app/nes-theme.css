@@ -74,6 +74,15 @@ html,
   cursor: pointer;
 }
 
+/*
+ * NES.css colours every anchor #007bff from the `nes` layer, which fails AA on
+ * both surfaces in both themes. Anchors styled as buttons opt out — they carry
+ * their own foreground.
+ */
+a:not(.nes-btn) {
+  color: var(--color-link);
+}
+
 :focus-visible {
   outline: 3px solid var(--color-streak);
   outline-offset: 2px;

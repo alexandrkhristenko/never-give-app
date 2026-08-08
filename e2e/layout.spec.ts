@@ -71,3 +71,11 @@ test('the theme choice survives a reload', async ({ page }) => {
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', chosen ?? '')
 })
+
+// Moved here from the streak suite: it needs no session, and skipping it
+// alongside the tests that do would lose the coverage for no reason.
+test('an unknown profile returns the 404 page', async ({ page }) => {
+  await page.goto('/nosuchplayer')
+
+  await expect(page.getByText('No player found at this address.')).toBeVisible()
+})

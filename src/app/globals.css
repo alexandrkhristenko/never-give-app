@@ -35,6 +35,15 @@
    */
   --color-warning: light-dark(#e8a317, #d99414);
   --color-warning-ink: #1a1d21;
+
+  /*
+   * Links. Without this they inherit NES.css's own #007bff, which measures
+   * 3.3:1 on the page background and 4.0:1 on a panel — under AA in both
+   * themes. Given its own token rather than borrowing `--color-freeze`: the
+   * two happen to want the same blue today, and coupling them would mean a
+   * change to one silently restyling the other.
+   */
+  --color-link: light-dark(#1c5f8f, #5cb8e8);
 }
 
 @layer base {
