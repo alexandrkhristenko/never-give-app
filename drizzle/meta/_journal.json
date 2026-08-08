@@ -29,6 +29,13 @@
       "when": 1786045420738,
       "tag": "0003_pin_reserved_user_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786045421738,
+      "tag": "0004_timestamps_with_zone",
+      "breakpoints": true
     }
   ]
 }

@@ -31,7 +31,7 @@ export const users = pgTable('users', {
   total_score: integer('total_score').notNull().default(0),
   streak_freezes_balance: integer('streak_freezes_balance').notNull().default(0),
   is_premium: boolean('is_premium').notNull().default(false),
-  created_at: timestamp('created_at').defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   // Usernames are compared case-insensitively: Player1 and player1 collide.
   uniqueIndex('users_username_lower_idx').on(sql`lower(${table.username})`),
@@ -51,8 +51,8 @@ export const promises = pgTable('promises', {
   cadence: varchar('cadence', { length: 50 }).notNull().default('daily'), // reserved: 'daily', 'weekly'
   cadence_count: integer('cadence_count').notNull().default(1), // reserved
   status: varchar('status', { length: 50 }).notNull().default('active'), // reserved: 'active', 'archived', 'failed'
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at').defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   // RLS policies filter by owner on every read; without this they seq-scan.
   index('promises_user_id_idx').on(table.user_id),
@@ -63,7 +63,7 @@ export const checkins = pgTable('checkins', {
   promise_id: uuid('promise_id').notNull().references(() => promises.id, { onDelete: 'cascade' }),
   local_date: date('local_date').notNull(), // 'YYYY-MM-DD' in the user's timezone
   note: text('note'), // reserved
-  created_at: timestamp('created_at').defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   // One check-in per day, and a covering index for lookups by promise.
   unique('checkin_promise_date_unique').on(table.promise_id, table.local_date),
@@ -77,7 +77,7 @@ export const streak_freezes = pgTable('streak_freezes', {
   id: uuid('id').primaryKey().defaultRandom(),
   promise_id: uuid('promise_id').notNull().references(() => promises.id, { onDelete: 'cascade' }),
   local_date: date('local_date').notNull(),
-  created_at: timestamp('created_at').defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   unique('streak_freeze_promise_date_unique').on(table.promise_id, table.local_date),
 ]);
@@ -86,7 +86,7 @@ export const streak_freezes = pgTable('streak_freezes', {
 export const followers = pgTable('followers', {
   follower_id: uuid('follower_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   following_id: uuid('following_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  created_at: timestamp('created_at').defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   primaryKey({ columns: [table.follower_id, table.following_id] }),
 ]);
