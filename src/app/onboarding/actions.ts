@@ -7,7 +7,7 @@ import {
   type OnboardingError,
 } from '@/lib/dal/promise'
 import { PROMISE_MAX_LENGTH, validateUsername } from '@/lib/validation'
-import { RATE_LIMITED_MESSAGE, withinRateLimit } from '@/lib/rate-limit'
+import { refusalMessage, withinRateLimit } from '@/lib/rate-limit'
 import { isUsernameTaken } from '@/lib/dal/username'
 import { logError } from '@/lib/log'
 
@@ -69,7 +69,12 @@ export async function checkUsername(username: string): Promise<UsernameStatus> {
   if (invalid === 'invalid_format') return 'invalid'
   if (invalid === 'reserved') return 'reserved'
 
-  if (!(await withinRateLimit('username'))) return 'rate_limited'
+  // `unavailable` maps to the status the catch below already uses: from the
+  // hint's point of view a limiter that cannot run and a lookup that cannot
+  // answer are the same event, and neither is the person's fault.
+  const budget = await withinRateLimit('username')
+  if (budget === 'limited') return 'rate_limited'
+  if (budget === 'unavailable') return 'unknown'
 
   try {
     return (await isUsernameTaken(username)) ? 'taken' : 'available'
@@ -92,8 +97,9 @@ export async function completeOnboarding(
   // oracle at the same time. It stays — the alternative is a form that refuses
   // without saying why — and the budget is what makes reading it one name at a
   // time the only way to use it.
-  if (!(await withinRateLimit('onboarding'))) {
-    return { error: RATE_LIMITED_MESSAGE, field: 'username' }
+  const budget = await withinRateLimit('onboarding')
+  if (budget !== 'allowed') {
+    return { error: refusalMessage(budget), field: 'username' }
   }
 
   const error = await createProfileAndPromise(session, {

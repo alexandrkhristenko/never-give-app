@@ -9,7 +9,7 @@ import { spendBudget } from '@/lib/rate-limit'
  * simultaneous requests can both believe they were under the limit is decided
  * by whether the increment takes a row lock. Whether the limiter can be read or
  * reset by a caller is decided by grants. Neither is visible from the
- * application code, which sees only a boolean.
+ * application code, which sees only a verdict.
  */
 
 const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 5 })
@@ -28,30 +28,30 @@ describe('spendBudget', () => {
   it('allows exactly the limit and then stops', async () => {
     const key = bucket('basic')
 
-    expect(await spendBudget(key, 3, 60)).toBe(true)
-    expect(await spendBudget(key, 3, 60)).toBe(true)
-    expect(await spendBudget(key, 3, 60)).toBe(true)
-    expect(await spendBudget(key, 3, 60)).toBe(false)
-    expect(await spendBudget(key, 3, 60)).toBe(false)
+    expect(await spendBudget(key, 3, 60)).toBe('allowed')
+    expect(await spendBudget(key, 3, 60)).toBe('allowed')
+    expect(await spendBudget(key, 3, 60)).toBe('allowed')
+    expect(await spendBudget(key, 3, 60)).toBe('limited')
+    expect(await spendBudget(key, 3, 60)).toBe('limited')
   })
 
   it('keeps buckets independent', async () => {
     const mine = bucket('mine')
     const yours = bucket('yours')
 
-    expect(await spendBudget(mine, 1, 60)).toBe(true)
-    expect(await spendBudget(mine, 1, 60)).toBe(false)
+    expect(await spendBudget(mine, 1, 60)).toBe('allowed')
+    expect(await spendBudget(mine, 1, 60)).toBe('limited')
 
     // Spending someone else's budget must not spend mine, or one noisy address
     // would lock out everybody behind a shared proxy.
-    expect(await spendBudget(yours, 1, 60)).toBe(true)
+    expect(await spendBudget(yours, 1, 60)).toBe('allowed')
   })
 
   it('starts a fresh window once the old one expires', async () => {
     const key = bucket('window')
 
-    expect(await spendBudget(key, 1, 60)).toBe(true)
-    expect(await spendBudget(key, 1, 60)).toBe(false)
+    expect(await spendBudget(key, 1, 60)).toBe('allowed')
+    expect(await spendBudget(key, 1, 60)).toBe('limited')
 
     // Backdating the window is how a test observes expiry without sleeping for
     // it. The function compares against `now()`, so moving the start is
@@ -60,7 +60,7 @@ describe('spendBudget', () => {
               set window_start = now() - interval '2 minutes'
               where bucket = ${key}`
 
-    expect(await spendBudget(key, 1, 60)).toBe(true)
+    expect(await spendBudget(key, 1, 60)).toBe('allowed')
   })
 
   it('does not overshoot when requests arrive together', async () => {
@@ -74,7 +74,7 @@ describe('spendBudget', () => {
       Array.from({ length: 12 }, () => spendBudget(key, 5, 60)),
     )
 
-    expect(results.filter(Boolean)).toHaveLength(5)
+    expect(results.filter((r) => r === 'allowed')).toHaveLength(5)
   })
 
   it('counts every attempt, including the rejected ones', async () => {
@@ -86,6 +86,21 @@ describe('spendBudget', () => {
     // A limiter that stopped counting once it started refusing would let a
     // caller who keeps hammering reset their window sooner than one who backs off.
     expect(row.hits).toBe(8)
+  })
+
+  it('reports a failed call as unavailable, not as a spent budget', async () => {
+    // The two refusals look identical from the outside and mean opposite
+    // things. Reporting an outage as "too many attempts" sends a person to wait
+    // out a window that is never going to open, which is what happened once the
+    // limiter met an environment where its function was out of reach.
+    //
+    // The failure is provoked with a limit that does not fit in `integer`,
+    // because that raises inside the call and touches nothing shared. Revoking
+    // the grant would model the real outage more closely and would also break
+    // sign-in for anyone using this database while the test ran.
+    const verdict = await spendBudget(bucket('broken'), 2 ** 31, 60)
+
+    expect(verdict).toBe('unavailable')
   })
 })
 
