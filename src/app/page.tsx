@@ -4,6 +4,7 @@ import AppHeader from '@/components/layout/app-header'
 import StreakChain from '@/components/streak/streak-chain'
 import Panel from '@/components/ui/panel'
 import { pixelButtonClass } from '@/components/ui/pixel-button'
+import { authErrorMessage } from '@/lib/auth-errors'
 import { datesBetween } from '@/lib/dates'
 import { readThemeCookie } from '@/lib/theme'
 import { buildChain } from '@/lib/view/chain'
@@ -52,7 +53,12 @@ const STEPS = [
   },
 ]
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  // Next 16: searchParams is a Promise. See docs/architecture.md §8.
+  searchParams: Promise<{ error?: string | string[] }>
+}) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -63,6 +69,11 @@ export default async function Home() {
 
   const theme = await readThemeCookie()
 
+  // `/auth/signin` and `/auth/callback` both send refusals here, because this
+  // is where all three sign-in buttons are. The message comes from our own
+  // table, never from the parameter — see `authErrorMessage`.
+  const authError = authErrorMessage((await searchParams).error)
+
   return (
     <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-8 p-4 sm:p-8">
       <AppHeader theme={theme} />
@@ -72,6 +83,12 @@ export default async function Home() {
         <p className="font-mono text-sm text-ink-muted">
           Promise publicly. Check in daily. Do not break the chain.
         </p>
+
+        {authError ? (
+          <p role="alert" className="font-mono text-xs text-streak">
+            {authError}
+          </p>
+        ) : null}
 
         <div className="flex w-full flex-col gap-3">
           <form action="/auth/signin" method="post">
