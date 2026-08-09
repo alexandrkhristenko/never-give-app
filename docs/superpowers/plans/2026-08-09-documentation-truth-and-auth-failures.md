@@ -512,7 +512,7 @@ EOF
 - [ ] **Step 1: Проверить своими глазами оба факта про статус и список имён**
 
 ```bash
-curl -s -o /dev/null -w "unknown profile: %{http_code}\n" https://never-give-app.vercel.app/nosuchuser000
+curl -s -o /dev/null -w "unknown profile: %{http_code}\n" https://www.never-give.app/nosuchuser000
 sed -n '16,31p' src/lib/validation.ts
 ```
 Expected: `200`, и список из 14 значений, начинающийся с `_next`.
@@ -1220,7 +1220,7 @@ EOF
 Это остаток бэклога, который нельзя закрыть кодом. Порядок — по цене отказа.
 
 1. **Включить Google и GitHub в Supabase** → Authentication → Providers, вписать client id и secret каждому. Сейчас `authorize` отвечает `400 provider is not enabled`, и две из трёх кнопок входа уводят человека на JSON вне приложения. Это единственный незакрытый пункт §7 product-spec, который остаётся требованием.
-2. **Добавить `https://never-give-app.vercel.app/auth/callback`** в Authentication → URL Configuration → Redirect URLs. Без этого подтверждение почты уводит не туда даже при верном `emailRedirectTo`.
+2. **Добавить `https://www.never-give.app/auth/callback`** в Authentication → URL Configuration → Redirect URLs. Домен, а не хост Vercel: `www.never-give.app` уже отвечает 200, apex редиректит на www. Без этого подтверждение почты уводит не туда даже при верном `emailRedirectTo`.
 3. **Развернуть ветку `feature/mvp-completion`.** На проде старая сборка: цепочка растёт не в ту сторону, `og:image` ведёт на localhost, формы обещают адрес на `never-give.app`.
 4. **Прогнать профиль через отладчики Facebook, X и Telegram** — после пункта 3, иначе они закэшируют старую карточку. Теги и картинка уже проверены, включая три краулерных User-Agent.
 5. **DSN Sentry**, если мониторинг нужен (B9). Работа после получения — одна функция.
