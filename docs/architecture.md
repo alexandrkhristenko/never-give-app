@@ -215,17 +215,37 @@ Cache Components (`cacheComponents: true`) **не включены**. Дейст
 Все `NEXT_PUBLIC_*` вшиваются **в момент сборки**, а не читаются при запуске.
 Добавить их в окружение недостаточно: нужна новая сборка, и без кэша.
 | `DATABASE_URL` | сервер | Строка подключения Postgres через pooler |
-| `NEXT_PUBLIC_SITE_URL` | сервер | Базовый URL для писем подтверждения и OG |
+| `NEXT_PUBLIC_SITE_URL` | сервер | Базовый URL для писем подтверждения и OG. **Необязательна на Vercel** — см. ниже |
 | `SUPABASE_SERVICE_ROLE_KEY` | **только тесты** | Создание тестового пользователя в E2E. Никогда не попадает в клиентский бандл |
 
 Всё с префиксом `NEXT_PUBLIC_` уходит в браузер. `DATABASE_URL` и
 `SUPABASE_SERVICE_ROLE_KEY` — никогда.
 
+Про `NEXT_PUBLIC_SITE_URL` таблица тоже врала, и это тоже стоило разбора на
+проде. Адрес брался как `NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'`, то
+есть незаданная переменная выдавала прод за localhost — и `og:image` уходил в
+мир как `http://localhost:3000/<ник>/opengraph-image`. Каждая площадка шла за
+картинкой к себе и не находила ничего: карточка пустая всюду, а в рендерере
+верная.
+
+Хуже, чем незаданная переменная: Vercel сам кладёт в окружение
+`VERCEL_PROJECT_PRODUCTION_URL`, и Next по умолчанию берёт его. Явный
+`metadataBase` перекрывал это значение localhost'ом — рабочая настройка
+заменялась нерабочей.
+
+Теперь порядок такой: `NEXT_PUBLIC_SITE_URL`, затем
+`VERCEL_PROJECT_PRODUCTION_URL`, и только потом localhost (`src/lib/site-url.ts`).
+На Vercel переменную можно не задавать вовсе; задавать её нужно, когда домен —
+не продовый хост Vercel. Не `VERCEL_URL`: тот уникален для каждого
+развёртывания, а этот же адрес должен лежать в Redirect URLs проекта Supabase,
+и тогда каждый preview требовал бы своей записи.
+
 ## 10. Деплой (Vercel)
 
 1. Импортировать репозиторий в Vercel
 2. Прописать переменные окружения из §9, кроме `SUPABASE_SERVICE_ROLE_KEY`
-3. `NEXT_PUBLIC_SITE_URL` — продовый домен
+3. `NEXT_PUBLIC_SITE_URL` — только если домен не совпадает с продовым хостом
+   Vercel; иначе адрес берётся из `VERCEL_PROJECT_PRODUCTION_URL` сам
 4. В Supabase → Authentication → URL Configuration добавить
    `<домен>/auth/callback` в Redirect URLs
 5. Миграции применяются командой `npm run db:migrate` из CI или локально
