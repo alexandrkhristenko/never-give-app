@@ -33,12 +33,21 @@ test('a full chain trims to 14 days on a narrow screen', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 })
   await page.goto('/')
 
-  const cells = page.locator('[data-testid="chain"][data-responsive]').locator('li')
+  const chain = page.locator('[data-testid="chain"][data-responsive]')
+  const cells = chain.locator('li')
 
   // All thirty are rendered; sixteen are hidden by CSS below `sm`.
   await expect(cells).toHaveCount(30)
+  await expect(chain.locator('li:visible')).toHaveCount(14)
+
+  // Which sixteen depends on where the window is anchored, so the assertion is
+  // about the two things that must hold at any anchor: today is one of the
+  // fourteen, and the trimming comes off whichever end is further from it.
+  // Asserting a fixed sixteen off the front would pass while hiding the whole
+  // chain of an account three days old.
+  await expect(chain.locator('li[data-today]')).toBeVisible()
   await expect(cells.first()).toBeHidden()
-  await expect(cells.nth(16)).toBeVisible()
+  await expect(cells.last()).toBeHidden()
 })
 
 test('a short chain is never trimmed', async ({ page }) => {

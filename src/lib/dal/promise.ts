@@ -56,6 +56,10 @@ function earliest(dates: LocalDate[]): LocalDate | null {
  * The window is contractually tied to `CHAIN_DAYS`: it must match what the
  * chain view actually renders, not whichever default `chainWindowStart`
  * happens to have.
+ *
+ * `chainWindowStart` and not `chainRenderStart`: the rendered window is
+ * anchored to the first check-in and so is a sub-range of this one. This is the
+ * widest it can be, which is what a fetch bound has to be.
  */
 function withinChainWindow(
   dates: LocalDate[],

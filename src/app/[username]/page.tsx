@@ -91,7 +91,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
         </div>
 
         <div className="w-full">
-          <StreakChain cells={cells} />
+          <StreakChain cells={cells} today={promise.today} />
         </div>
 
         {promise.startedOn ? (

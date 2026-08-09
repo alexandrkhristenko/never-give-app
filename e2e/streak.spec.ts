@@ -49,6 +49,21 @@ test('a new player onboards, checks in, and shows up publicly', async ({
     page.getByRole('status').filter({ hasText: 'DONE FOR TODAY' }),
   ).toBeVisible()
 
+  // A streak reads left to right, so a first check-in belongs in the first
+  // cell. Anchored to today instead, this very cell sat against the right edge
+  // behind twenty-nine cells standing for days before the account existed —
+  // which is what a chain that has ended looks like, not one that has started.
+  const chain = page.locator('[data-testid="chain"]')
+  await expect(chain.locator('li').first()).toHaveAttribute(
+    'data-state',
+    'checked',
+  )
+  await expect(chain.locator('li[data-state="checked"]')).toHaveCount(1)
+  await expect(chain.locator('li[data-today]')).toHaveAttribute(
+    'data-state',
+    'checked',
+  )
+
   // The design spec wants the horizontal-overflow check on the dashboard and
   // the public profile as well as the landing page. Those two need a session
   // and a seeded user, so they are asserted here rather than in the
@@ -58,6 +73,9 @@ test('a new player onboards, checks in, and shows up publicly', async ({
     // Re-assert content at each width: an overflow check alone passes on a
     // page that failed to render, because both measurements would be zero.
     await expect(page.getByTestId('current-streak')).toBeVisible()
+    // Below `sm` only fourteen of the thirty cells survive. Dropping a fixed
+    // sixteen off the front would take this one-day chain with them.
+    await expect(chain.locator('li[data-state="checked"]')).toBeVisible()
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth -
         document.documentElement.clientWidth,

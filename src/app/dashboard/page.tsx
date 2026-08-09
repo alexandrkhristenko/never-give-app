@@ -58,7 +58,7 @@ export default async function DashboardPage() {
         />
 
         <div className="w-full">
-          <StreakChain cells={cells} />
+          <StreakChain cells={cells} today={promise.today} />
         </div>
 
         {promise.startedOn === null ? (
