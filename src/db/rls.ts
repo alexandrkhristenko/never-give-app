@@ -1,10 +1,10 @@
 import 'server-only'
 import { sql } from 'drizzle-orm'
-import { db } from './index'
+import { database } from './index'
 
 /** The transaction handle Drizzle hands to a `db.transaction` callback. */
 export type DbTransaction = Parameters<
-  Parameters<typeof db.transaction>[0]
+  Parameters<ReturnType<typeof database>['transaction']>[0]
 >[0]
 
 /**
@@ -20,7 +20,7 @@ export async function withUser<T>(
 ): Promise<T> {
   const claims = JSON.stringify({ sub: userId, role: 'authenticated' })
 
-  return db.transaction(async (tx) => {
+  return database().transaction(async (tx) => {
     // Claims first: after the role switch we no longer have the privileges to
     // set them. `true` makes both settings transaction-local, which is what
     // keeps a pooled connection from leaking a role to the next request.
@@ -38,7 +38,7 @@ export async function withUser<T>(
 export async function withAnon<T>(
   fn: (tx: DbTransaction) => Promise<T>,
 ): Promise<T> {
-  return db.transaction(async (tx) => {
+  return database().transaction(async (tx) => {
     await tx.execute(sql`select set_config('request.jwt.claims', null, true)`)
     await tx.execute(sql`select set_config('role', 'anon', true)`)
 
