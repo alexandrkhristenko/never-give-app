@@ -127,3 +127,63 @@ test('interactive elements take focus and show it', async ({ page }) => {
   )
   expect(parseFloat(outlineWidth)).toBeGreaterThan(0)
 })
+
+/*
+ * A form control has to have a visible boundary — WCAG 1.4.11, non-text
+ * contrast — and in the dark theme these had none at all: an empty field was a
+ * rectangle of very slightly lighter background and nothing else.
+ *
+ * The cause is worth encoding rather than describing. NES.css draws the border
+ * of `.nes-input`, `.nes-textarea` and `.nes-select select` with
+ * `border-image-source`: an inline SVG whose fill is baked in as
+ * `rgb(33,37,41)`. A border image replaces the border colour outright, so
+ * `nes-theme.css` setting `border-color: var(--color-edge)` had never once had
+ * an effect. In the light theme the baked near-black happens to be right; in
+ * the dark theme it is black on black.
+ *
+ * Asserting the computed colour alone cannot catch this — it reports the value
+ * we set while the image paints something else. So the assertion is on the
+ * image: any control that carries one is lying about its border.
+ */
+test('form controls have a border that follows the theme', async ({ page }) => {
+  for (const theme of ['dark', 'light'] as const) {
+    await page.context().clearCookies()
+    await page.context().addCookies([
+      { name: 'theme', value: theme, url: 'http://localhost:3000' },
+    ])
+    await page.goto('/login')
+    await settled(page)
+
+    // Resolved through a throwaway element rather than read off the custom
+    // property: the variable holds a hex string and `borderTopColor` is always
+    // reported as `rgb(...)`, so comparing the two directly compares notations.
+    const edge = await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.borderColor = 'var(--color-edge)'
+      document.body.append(probe)
+      const resolved = getComputedStyle(probe).borderTopColor
+      probe.remove()
+      return resolved
+    })
+
+    const controls = page.locator('input:not([type="hidden"]), select, textarea')
+    const count = await controls.count()
+    expect(count, `${theme}: controls on /login`).toBeGreaterThan(0)
+
+    for (let i = 0; i < count; i++) {
+      const seen = await controls.nth(i).evaluate((el) => {
+        const style = getComputedStyle(el)
+        return {
+          id: el.id,
+          image: style.borderImageSource,
+          color: style.borderTopColor,
+          width: parseFloat(style.borderTopWidth),
+        }
+      })
+
+      expect(seen.image, `${theme}: ${seen.id} border image`).toBe('none')
+      expect(seen.width, `${theme}: ${seen.id} border width`).toBeGreaterThan(0)
+      expect(seen.color, `${theme}: ${seen.id} border colour`).toBe(edge)
+    }
+  }
+})
