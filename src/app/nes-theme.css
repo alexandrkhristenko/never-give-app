@@ -42,6 +42,19 @@
   cursor: pointer;
   box-shadow: var(--shadow-pixel-sm);
   transition: translate 80ms steps(2, end), box-shadow 80ms steps(2, end);
+  /*
+   * The same baked border image the inputs carried, and the same consequence
+   * hidden better. The coloured variants got away with it — their border is
+   * `currentColor`, which for `is-primary`, `is-success` and `is-error` is the
+   * dark panel ink, so the fill happened to be the right answer. This one did
+   * not: its ink is light, its background *is* the panel behind it, and the
+   * border meant to separate the two painted itself black on black. What was
+   * left of the button was its text and its drop shadow.
+   *
+   * Dropping the image leaves every variant outlined in its own ink, which is
+   * why a blue primary button does not grow a pale border in the dark theme.
+   */
+  border-image-source: none;
 }
 
 /*
