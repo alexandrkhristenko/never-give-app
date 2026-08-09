@@ -24,9 +24,12 @@
 /login                   Форма email + пароль (Client Component)
 /onboarding              Первичная настройка: username, обещание, видимость
 /dashboard               Личный кабинет: стрик, кнопка чек-ина
+/settings                Обещание, видимость, таймзона, удаление аккаунта
 /<username>              Публичный профиль. Динамический сегмент в корне
+/<username>/opengraph-image   OG-картинка профиля, 1200×630 PNG
 /auth/signin             POST-роут: старт OAuth-редиректа
-/auth/callback           GET-роут: обмен кода на сессию
+/auth/callback           GET-роут: обмен кода на сессию либо разбор отказа
+/robots.txt              Единственный статический маршрут в проекте
 ```
 
 Публичный профиль занимает **корневой** сегмент, поэтому username не может
@@ -44,18 +47,30 @@ src/
     page.tsx                Лендинг
     login/                  page.tsx (client) + actions.ts
     onboarding/             page.tsx + actions.ts + onboarding-form.tsx (client)
-    dashboard/              page.tsx + actions.ts + error.tsx
-    [username]/             page.tsx + not-found.tsx
+    dashboard/              page.tsx + actions.ts + error.tsx + loading.tsx
+    settings/               page.tsx + actions.ts + promise-form.tsx +
+                            timezone-form.tsx + delete-account.tsx (client)
+    [username]/             page.tsx + not-found.tsx + opengraph-image.tsx
+    robots.ts               robots.txt. Sitemap намеренно не объявлен
     auth/signin/route.ts    Старт OAuth
-    auth/callback/route.ts  Обмен кода на сессию
+    auth/callback/route.ts  Обмен кода на сессию либо разбор отказа
+  components/
+    layout/, share/, streak/, ui/   Презентационные компоненты
   db/
     index.ts                Подключение Drizzle (сервисное, без RLS)
     rls.ts                  Обёртки withUser / withAnon — запросы под RLS
-    schema.ts               Таблицы, индексы, политики
+    schema.ts               Таблицы, индексы, ограничения. Политик здесь нет —
+                            они в рукописных миграциях, см. data-model.md
   lib/
     dates.ts                Чистые операции с локальными датами
     streak.ts               Чистая логика стриков и заморозок
-    validation.ts           Валидация username
+    validation.ts           Валидация username и длины обещания
+    log.ts                  Структурный логгер, по строке JSON на событие
+    rate-limit.ts           Обёртка над private.rate_limit_hit
+    site-url.ts             Собственный адрес приложения и его источник
+    theme.ts                Чтение cookie темы
+    auth-errors.ts          Код отказа входа → предложение для человека
+    view/chain.ts           Окно цепочки и состояния клеток
     dal/                    Data Access Layer, server-only
       session.ts            Сессия и её проверка
       user.ts               Профиль
@@ -64,6 +79,8 @@ src/
     client.ts               Браузерный клиент
     server.ts               Серверный клиент (cookies)
     middleware.ts           Обновление сессии для proxy.ts
+    credentials.ts          Адрес и ключ проекта, и заданы ли они вообще
+    report.ts               Однократная запись о ненастроенности
 ```
 
 **Принцип разделения:**
@@ -206,20 +223,27 @@ Cache Components (`cacheComponents: true`) **не включены**. Дейст
 | `NEXT_PUBLIC_SUPABASE_URL` | клиент, сервер | URL проекта Supabase |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | клиент, сервер | Публикуемый ключ. Предпочтителен |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | клиент, сервер | Legacy-ключ. Годится, если первого нет |
+| `DATABASE_URL` | сервер | Строка подключения Postgres через pooler, режим Transaction, порт 6543 |
+| `POSTGRES_URL` | сервер | То же. Под этим именем строку кладёт интеграция Supabase; принимается, `DATABASE_URL` предпочтительнее |
+| `NEXT_PUBLIC_SITE_URL` | сервер | Базовый URL для писем подтверждения и OG. **Необязательна на Vercel** — см. ниже |
+| `VERCEL_PROJECT_PRODUCTION_URL` | сервер | Кладёт Vercel. Используется, когда `NEXT_PUBLIC_SITE_URL` не задан |
 
-Про эти две строки таблица до недавнего времени врала, и это стоило разбора на
-проде. «Предпочтителен» описывало намерение, а весь код читал только
+`SUPABASE_SERVICE_ROLE_KEY` в списке **нет намеренно.** Он не нужен ни
+приложению, ни тестам: E2E заводит аккаунт через `DATABASE_URL`. Всё, что читает
+серверный рантайм приложения, не должно уметь обходить RLS.
+
+`POSTGRES_URL_NON_POOLING` намеренно не принимается — это прямое подключение,
+из Vercel по IPv4 недостижимое.
+
+Всё с префиксом `NEXT_PUBLIC_` уходит в браузер и вшивается **в момент
+сборки**, а не читается при запуске: добавить переменную в окружение
+недостаточно, нужна новая сборка, и без кэша. `DATABASE_URL` в браузер не
+уходит никогда.
+
+Про две строки с ключами таблица до недавнего времени врала, и это стоило
+разбора на проде. «Предпочтителен» описывало намерение, а весь код читал только
 `ANON_KEY`, поэтому окружение, настроенное строго по документации, не могло
 никого пустить. Теперь принимаются оба имени, `PUBLISHABLE_KEY` первым.
-
-Все `NEXT_PUBLIC_*` вшиваются **в момент сборки**, а не читаются при запуске.
-Добавить их в окружение недостаточно: нужна новая сборка, и без кэша.
-| `DATABASE_URL` | сервер | Строка подключения Postgres через pooler |
-| `NEXT_PUBLIC_SITE_URL` | сервер | Базовый URL для писем подтверждения и OG. **Необязательна на Vercel** — см. ниже |
-| `SUPABASE_SERVICE_ROLE_KEY` | **только тесты** | Создание тестового пользователя в E2E. Никогда не попадает в клиентский бандл |
-
-Всё с префиксом `NEXT_PUBLIC_` уходит в браузер. `DATABASE_URL` и
-`SUPABASE_SERVICE_ROLE_KEY` — никогда.
 
 Про `NEXT_PUBLIC_SITE_URL` таблица тоже врала, и это тоже стоило разбора на
 проде. Адрес брался как `NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'`, то
