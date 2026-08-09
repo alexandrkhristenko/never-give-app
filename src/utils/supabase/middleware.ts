@@ -1,14 +1,19 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { supabaseCredentials } from './credentials'
+import { reportIfMisconfigured } from './report'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
+  const credentials = supabaseCredentials()
+  reportIfMisconfigured(credentials)
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy',
+    credentials.url,
+    credentials.key,
     {
       cookies: {
         getAll() {

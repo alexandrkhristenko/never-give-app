@@ -1,12 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { supabaseCredentials } from './credentials'
+import { reportIfMisconfigured } from './report'
 
 export async function createClient() {
   const cookieStore = await cookies()
 
+  const credentials = supabaseCredentials()
+  reportIfMisconfigured(credentials)
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy',
+    credentials.url,
+    credentials.key,
     {
       cookies: {
         getAll() {
