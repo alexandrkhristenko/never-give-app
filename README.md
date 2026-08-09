@@ -49,6 +49,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 Ключи — в Supabase Dashboard → Project Settings → API.
 `DATABASE_URL` — там же, Connection Pooling, режим **Transaction**, порт `6543`.
 
+`NEXT_PUBLIC_SITE_URL` локально нужен, на Vercel — нет: там адрес берётся из
+`VERCEL_PROJECT_PRODUCTION_URL`. Задавайте его в проде только под свой домен.
+
 `.env.local` в `.gitignore`. Никогда не коммитьте его.
 
 ### 3. Схема БД

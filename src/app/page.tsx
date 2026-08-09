@@ -109,7 +109,7 @@ export default async function Home() {
           seven days, and you can hold three.
         </p>
 
-        <StreakChain cells={FREEZE_DEMO} />
+        <StreakChain cells={FREEZE_DEMO} today={DEMO_TODAY} />
 
         <p className="font-mono text-xs text-ink-muted">
           All or nothing: if your freezes cannot cover the whole gap, none are
@@ -119,7 +119,7 @@ export default async function Home() {
       </Panel>
 
       <Panel title="A REAL CHAIN" className="flex flex-col gap-4">
-        <StreakChain cells={DEMO_CHAIN} />
+        <StreakChain cells={DEMO_CHAIN} today={DEMO_TODAY} />
         <p className="font-mono text-xs text-ink-muted">
           This is what your public profile shows. One missed day, one saved by a
           freeze, the rest earned.

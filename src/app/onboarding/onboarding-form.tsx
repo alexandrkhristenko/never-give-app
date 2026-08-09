@@ -27,7 +27,12 @@ const STATUS_TEXT: Partial<Record<UsernameStatus, string>> = {
   // being scolded mid-word.
 }
 
-export default function OnboardingForm() {
+export default function OnboardingForm({
+  host,
+}: {
+  /** Where this deployment actually answers. Passed in: see `siteHost`. */
+  host: string
+}) {
   const [state, action, pending] = useActionState(
     completeOnboarding,
     INITIAL_STATE,
@@ -92,7 +97,7 @@ export default function OnboardingForm() {
       <Field
         id="username"
         label="Choose a username"
-        hint={`never-give.app/${username || 'username'}`}
+        hint={`${host}/${username || 'username'}`}
         error={errorFor('username')}
       >
         <input

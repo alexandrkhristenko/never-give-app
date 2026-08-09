@@ -10,6 +10,7 @@ import Panel from '@/components/ui/panel'
 import { pixelButtonClass } from '@/components/ui/pixel-button'
 import { getPublicProfile } from '@/lib/dal/user'
 import { getPublicPromiseView } from '@/lib/dal/promise'
+import { siteUrl } from '@/lib/site-url'
 import { readThemeCookie } from '@/lib/theme'
 import { buildChain } from '@/lib/view/chain'
 
@@ -17,10 +18,9 @@ interface PageProps {
   params: Promise<{ username: string }>
 }
 
-// Same fallback as `src/app/login/actions.ts` and README §Переменные: an unset
-// variable means local development, so the share button must copy a localhost
-// URL rather than a production one that may resolve to somebody else's account.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+// Resolved once per module load, like the rest of the environment. `siteUrl`
+// explains the order, including why localhost stays last rather than first.
+const SITE_URL = siteUrl().url
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params
@@ -91,7 +91,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
         </div>
 
         <div className="w-full">
-          <StreakChain cells={cells} />
+          <StreakChain cells={cells} today={promise.today} />
         </div>
 
         {promise.startedOn ? (

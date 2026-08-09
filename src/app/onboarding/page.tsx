@@ -3,6 +3,7 @@ import Panel from '@/components/ui/panel'
 import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
+import { siteHost } from '@/lib/site-url'
 import OnboardingForm from './onboarding-form'
 
 export default async function OnboardingPage() {
@@ -23,7 +24,7 @@ export default async function OnboardingPage() {
   return (
     <main className="mx-auto flex w-full max-w-[42rem] flex-col gap-6 p-4 sm:p-8">
       <Panel title="WELCOME, PLAYER 1">
-        <OnboardingForm />
+        <OnboardingForm host={siteHost()} />
       </Panel>
     </main>
   )

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Press_Start_2P } from 'next/font/google'
+import { siteUrl } from '@/lib/site-url'
 import { readThemeCookie } from '@/lib/theme'
 import './globals.css'
 
@@ -11,17 +12,15 @@ const pressStart2P = Press_Start_2P({
   display: 'swap',
 })
 
-// Same fallback as `src/app/[username]/page.tsx` and `src/app/login/actions.ts`:
-// an unset variable means local development.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-
 export const metadata: Metadata = {
   title: 'never-give.app',
   description: 'Promise publicly. Check in daily. Do not break the chain.',
-  // Next resolves file-convention og:image URLs against this. Without it,
-  // og:image falls back to VERCEL_PROJECT_PRODUCTION_URL or localhost, which
-  // disagrees with the origin the rest of the app (e.g. the share bar) uses.
-  metadataBase: new URL(SITE_URL),
+  // Next resolves file-convention og:image URLs against this, and setting it
+  // here is what keeps that origin identical to the one the share bar copies.
+  // Which is also how this line came to break production: it used to resolve
+  // to localhost, overriding the deployment host Next would have found by
+  // itself. See `siteUrl`.
+  metadataBase: new URL(siteUrl().url),
 }
 
 export default async function RootLayout({
