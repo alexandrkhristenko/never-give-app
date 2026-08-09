@@ -11,8 +11,12 @@ import type { SupabaseCredentials } from './credentials'
  * lives, since these values are fixed at build time.
  *
  * Measured, not assumed: thirty requests produce **two** lines, not one. The
- * middleware runs in the edge runtime and the server client in Node, so each
- * holds its own copy of this module. Two is the ceiling, and two is fine.
+ * proxy and the server client are bundled separately, so each holds its own
+ * copy of this module and its own `reported` flag. Two is the ceiling, and two
+ * is fine.
+ *
+ * Not two runtimes: `src/proxy.ts` declares none, and Proxy in Next 16 runs on
+ * Node — see docs/architecture.md §7. Separate bundles, one runtime.
  */
 let reported = false
 

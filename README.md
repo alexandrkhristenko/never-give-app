@@ -13,8 +13,11 @@
 | [docs/product-spec.md](docs/product-spec.md) | Что делает продукт. Правила стрика и заморозок — нормативные |
 | [docs/architecture.md](docs/architecture.md) | Стек, роуты, аутентификация, RLS, особенности Next.js 16 |
 | [docs/data-model.md](docs/data-model.md) | Таблицы, инварианты, политики RLS |
-| [docs/known-issues.md](docs/known-issues.md) | Дефекты и осознанный техдолг |
+| [docs/debt.md](docs/debt.md) | Реестр долга: что закрыто, что заблокировано, что решено не чинить |
+| [docs/handover.md](docs/handover.md) | Что осталось сделать руками |
+| [docs/known-issues.md](docs/known-issues.md) | История дефектов MVP и осознанный техдолг |
 | [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации |
+| [docs/pr-description-auth-and-docs.md](docs/pr-description-auth-and-docs.md) | Описание текущего PR |
 
 ## Стек
 
@@ -67,6 +70,12 @@ npm run db:migrate
 - **Providers** — включите Google и GitHub, пропишите их client id и secret
 - **URL Configuration** → Redirect URLs — добавьте `http://localhost:3000/auth/callback`
 
+Если провайдеров не включить, кнопки «Sign in with Google» и «Sign in with
+GitHub» на лендинге уводят на страницу Supabase с ответом
+`400 provider is not enabled` — вне приложения. Код входа при этом исправен:
+отказ приходит от эндпоинта Supabase, а не от нас. Вход по email работает
+независимо от этого.
+
 ### 5. Запуск
 
 ```bash
@@ -86,6 +95,8 @@ npm run dev
 | `npm test` | Юнит-тесты (Vitest), один прогон |
 | `npm run test:watch` | Юнит-тесты в watch-режиме |
 | `npm run test:e2e` | E2E-тесты (Playwright) |
+| `npm run test:db` | Тесты против настоящей базы (Vitest, отдельный конфиг) |
+| `npm run db:prune-test-users` | Сметает аккаунты от прерванного прогона E2E |
 | `npm run db:generate` | Сгенерировать миграцию из `src/db/schema.ts` |
 | `npm run db:migrate` | Применить миграции |
 | `npm run db:studio` | Drizzle Studio |
@@ -99,15 +110,24 @@ npm run dev
 с локальными датами, валидацию username. Компоненты и async Server Components
 юнит-тестами не покрываются: это прямая рекомендация документации Next.js.
 
-**E2E** покрывают сквозные сценарии в реальном браузере. Требуют
-дополнительной переменной в `.env.test.local`:
+**E2E** покрывают сквозные сценарии в реальном браузере против продовой
+сборки: `npm run test:e2e`.
 
-```bash
-SUPABASE_SERVICE_ROLE_KEY=<service role key>
-```
+**Тесты БД** (`npm run test:db`) прогоняют функции DAL против настоящей базы —
+списание заморозок, правило «всё или нет», колоночные гранты, политики на
+`streak_freezes`, ограничитель частоты. Это то, чего юнит-тесты чистых функций
+не достают.
 
-Ключ используется только для создания и удаления тестового пользователя.
-В клиентский бандл он не попадает и в `.env.local` ему делать нечего.
+Оба набора заводят тестовый аккаунт **через `DATABASE_URL`**, напрямую в
+`auth.users`. `SUPABASE_SERVICE_ROLE_KEY` не нужен и не должен появляться в
+`.env.local`: всё, что читает серверный рантайм приложения, не должно уметь
+обходить RLS. Обоснование и цена этого решения — [docs/debt.md](docs/debt.md) B1.
+
+Оба набора пишут в ту же базу, на которую указывает `DATABASE_URL`. Если это
+продовая база — а сейчас это она, — то прогон тестов есть операция над
+продовыми данными. Удаления в наборах привязаны к своему `id` или к домену
+`@never-give.test`; `npm run db:prune-test-users` сметает то, что осталось от
+прерванного прогона (по умолчанию только показывает, удаляет с `--delete`).
 
 ## Деплой
 

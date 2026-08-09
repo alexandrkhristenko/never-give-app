@@ -1,3 +1,6 @@
+> **Историческое.** Описание влитого PR #1 (`f4a6e81`) на момент 2026-08-08.
+> Цифры в нём — тогдашние: юнитов было 76, сейчас больше. Не обновляется.
+
 MVP completion: streaks, freezes, RLS and the frontend
 
 Brings never-give.app to a working MVP. Executed from
