@@ -1,8 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { supabaseCredentials } from './credentials'
 
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy'
-  )
+  const { url, key } = supabaseCredentials()
+  return createBrowserClient(url, key)
 }
