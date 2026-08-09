@@ -16,7 +16,7 @@
 | [docs/debt.md](docs/debt.md) | Реестр долга: что закрыто, что заблокировано, что решено не чинить |
 | [docs/handover.md](docs/handover.md) | Что осталось сделать руками |
 | [docs/known-issues.md](docs/known-issues.md) | История дефектов MVP и осознанный техдолг |
-| [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации |
+| [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации. Актуальный — [дальнейшие шаги](docs/superpowers/plans/2026-08-10-next-steps.md) |
 | [docs/pr-description-auth-and-docs.md](docs/pr-description-auth-and-docs.md) | Описание текущего PR |
 
 ## Стек
