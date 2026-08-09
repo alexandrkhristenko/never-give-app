@@ -88,3 +88,33 @@ export function isKnownTimezone(timezone: string): boolean {
     return false
   }
 }
+
+/**
+ * What to store for a zone the browser submitted, and whether it said anything
+ * at all.
+ *
+ * `UTC` is both a real answer and the absence of one, and the two used to be
+ * indistinguishable: onboarding read `formData.get('timezone') || 'UTC'`.
+ *
+ * The absence is reachable. The hidden field is filled by an effect, so a
+ * submit that beats hydration sends the value that was in the HTML. Reproduced
+ * on production with the JS chunks held back twenty seconds: a browser in
+ * `America/New_York` created an account in `UTC`, and nothing anywhere said so.
+ * The consequence is not cosmetic — the day boundary is the product, and it
+ * landed at 19:00 local.
+ *
+ * Signup still is not refused over this: the value arrives unprompted and a
+ * blocked registration is worse than a wrong clock, the same trade `isKnownTimezone`
+ * above is written for. What changes is that the caller can now tell, and say so
+ * in the log.
+ */
+export function resolveTimezone(raw: string | null | undefined): {
+  timezone: string
+  detected: boolean
+} {
+  if (!raw) return { timezone: 'UTC', detected: false }
+  // Caught here rather than stored: `getProfile` would otherwise warn on every
+  // read, and the settings select would carry a value no list contains.
+  if (!isKnownTimezone(raw)) return { timezone: 'UTC', detected: false }
+  return { timezone: raw, detected: true }
+}

@@ -17,6 +17,7 @@
 | [docs/handover.md](docs/handover.md) | Что осталось сделать руками |
 | [docs/known-issues.md](docs/known-issues.md) | История дефектов MVP и осознанный техдолг |
 | [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации |
+| [docs/pr-description-auth-and-docs.md](docs/pr-description-auth-and-docs.md) | Описание текущего PR |
 
 ## Стек
 

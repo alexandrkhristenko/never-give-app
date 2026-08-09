@@ -6,10 +6,14 @@ import {
   createProfileAndPromise,
   type OnboardingError,
 } from '@/lib/dal/promise'
-import { PROMISE_MAX_LENGTH, validateUsername } from '@/lib/validation'
+import {
+  PROMISE_MAX_LENGTH,
+  resolveTimezone,
+  validateUsername,
+} from '@/lib/validation'
 import { refusalMessage, withinRateLimit } from '@/lib/rate-limit'
 import { isUsernameTaken } from '@/lib/dal/username'
-import { logError } from '@/lib/log'
+import { logError, logWarn } from '@/lib/log'
 
 /**
  * `field` says which control the message belongs to, so the form can hand it
@@ -102,11 +106,21 @@ export async function completeOnboarding(
     return { error: refusalMessage(budget), field: 'username' }
   }
 
+  // `UTC` is both a real answer and the absence of one. The hidden field is
+  // filled by an effect, so a submit that beats hydration sends nothing — and
+  // the account is created on a day boundary the person never chose. Storing
+  // UTC anyway is still the right trade (see `resolveTimezone`); being unable
+  // to count how often it happens was not.
+  const zone = resolveTimezone(formData.get('timezone')?.toString())
+  if (!zone.detected) {
+    logWarn('onboarding.timezone_absent', { userId: session.id })
+  }
+
   const error = await createProfileAndPromise(session, {
     username: String(formData.get('username') ?? ''),
     promiseTitle: String(formData.get('promise') ?? ''),
     visibility: String(formData.get('visibility') ?? 'public'),
-    timezone: String(formData.get('timezone') || 'UTC'),
+    timezone: zone.timezone,
   })
 
   if (error) return { error: MESSAGES[error], field: FIELDS[error] }

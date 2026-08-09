@@ -166,7 +166,11 @@ export default function OnboardingForm({
         </div>
       </Field>
 
-      <input type="hidden" name="timezone" ref={timezoneRef} defaultValue="UTC" />
+      {/* Deliberately empty rather than `UTC`: the effect above fills it, and a
+          submit that beats hydration must be distinguishable from a browser
+          that really is in UTC. The server decides what to store — see
+          `resolveTimezone`. */}
+      <input type="hidden" name="timezone" ref={timezoneRef} defaultValue="" />
 
       <PixelButton type="submit" variant="primary" full aria-busy={pending}>
         {pending ? 'STARTING...' : 'START GAME'}

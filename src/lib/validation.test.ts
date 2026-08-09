@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   PROMISE_MAX_LENGTH,
+  resolveTimezone,
   validatePromiseTitle,
   validateUsername,
 } from './validation'
@@ -96,5 +97,45 @@ describe('RESERVED_USERNAMES coverage', () => {
     // `_next` passes the username pattern, so nothing but this list stops a
     // profile from claiming the path Next serves its own assets from.
     expect(validateUsername('_next')).toBe('reserved')
+  })
+})
+
+describe('resolveTimezone', () => {
+  it('keeps a zone the browser reported', () => {
+    expect(resolveTimezone('America/New_York')).toEqual({
+      timezone: 'America/New_York',
+      detected: true,
+    })
+  })
+
+  // A browser genuinely in UTC is not the same as a browser that never spoke.
+  it('treats a reported UTC as reported', () => {
+    expect(resolveTimezone('UTC')).toEqual({ timezone: 'UTC', detected: true })
+  })
+
+  /*
+   * The case this function exists for. The onboarding form fills its hidden
+   * field from an effect, so a submit that beats hydration sends nothing —
+   * reproduced on production with the JS chunks delayed. The old code read
+   * `formData.get('timezone') || 'UTC'` and could not tell that apart from a
+   * browser in London.
+   */
+  it('reports an absent zone as undetected', () => {
+    expect(resolveTimezone('')).toEqual({ timezone: 'UTC', detected: false })
+    expect(resolveTimezone(null)).toEqual({ timezone: 'UTC', detected: false })
+    expect(resolveTimezone(undefined)).toEqual({
+      timezone: 'UTC',
+      detected: false,
+    })
+  })
+
+  // Better caught here than stored: `getProfile` would otherwise warn about it
+  // on every read, and the settings select would have to carry a value no list
+  // contains.
+  it('refuses a zone no runtime can resolve', () => {
+    expect(resolveTimezone('Not/AZone')).toEqual({
+      timezone: 'UTC',
+      detected: false,
+    })
   })
 })

@@ -20,6 +20,24 @@ const eslintConfig = defineConfig([
     files: ["e2e/**", "playwright.config.ts"],
     rules: { "react-hooks/rules-of-hooks": "off" },
   },
+  {
+    // A leading underscore is how this codebase says "the signature requires
+    // this parameter and the body has no use for it" — `checkInAction` takes
+    // `_prevState` and `_formData` because `useActionState` passes them.
+    // Without this the rule reports exactly the cases the convention exists to
+    // mark, which trains everybody to read warnings as noise.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
