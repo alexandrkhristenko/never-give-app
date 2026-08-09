@@ -1,9 +1,9 @@
-import { expect, hasAdminAccess, missingKeyReason, test } from './fixtures'
+import { expect, hasDatabaseAccess, missingDatabaseReason, test } from './fixtures'
 
-// Without the service-role key there is no way to create a test account, so
-// these skip rather than fail — and say why, so the gap is visible in the
-// report instead of looking like a passing run.
-test.skip(!hasAdminAccess, missingKeyReason)
+// Without a database there is no way to create a test account, so these skip
+// rather than fail — and say why, so the gap is visible in the report instead
+// of looking like a passing run.
+test.skip(!hasDatabaseAccess, missingDatabaseReason)
 
 /** Same widths the layout suite uses, so the two agree on what "narrow" means. */
 const VIEWPORTS = [320, 375, 768, 1280]
@@ -28,7 +28,12 @@ test('a new player onboards, checks in, and shows up publicly', async ({
   await page.getByRole('button', { name: 'Start Game' }).click()
 
   await expect(page).toHaveURL('/dashboard')
-  await expect(page.getByText('Ship every day')).toBeVisible()
+  // By role, not by text: Next announces every route change into a live region
+  // that carries the page heading, so a bare text match resolves to two
+  // elements and fails strict mode.
+  await expect(
+    page.getByRole('heading', { name: 'Ship every day' }),
+  ).toBeVisible()
   await expect(page.getByTestId('current-streak')).toHaveText('0')
 
   await page.getByRole('button', { name: 'CHECK IN TODAY' }).click()

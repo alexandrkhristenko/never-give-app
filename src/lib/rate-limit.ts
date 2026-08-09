@@ -75,18 +75,26 @@ const LIMITS: Record<RateLimitScope, Limit> = {
 }
 
 /**
+ * What the limiter decided.
+ *
+ * `unavailable` is not the same refusal as `limited`, and collapsing the two
+ * was a real defect rather than a tidiness question. Both stop the request —
+ * failing closed is deliberate, see `spendBudget` — but they need different
+ * words, because "too many attempts" sends a person to wait out a window that
+ * will never open while the actual fault is that the server cannot reach its
+ * database. That is a message which is most misleading exactly when the system
+ * is most broken.
+ */
+export type RateLimitVerdict = 'allowed' | 'limited' | 'unavailable'
+
+/**
  * Records one request against the caller's budget for `scope`.
  *
- * Returns false when the budget is spent.
- *
- * Fails **closed** — a database error is reported as "over the limit" rather
- * than waved through. That is cheap here in a way it usually is not: the
- * counter lives in the same database every page already needs, so a failure
- * that would block the limiter was going to fail the request anyway. Failing
- * open would only mean the enumeration guard is the first thing to disappear
- * exactly when the system is unhealthy.
+ * Anything other than `allowed` means the request must not proceed.
  */
-export async function withinRateLimit(scope: RateLimitScope): Promise<boolean> {
+export async function withinRateLimit(
+  scope: RateLimitScope,
+): Promise<RateLimitVerdict> {
   const { max, windowSeconds } = LIMITS[scope]
   return spendBudget(`${scope}:${await clientAddress()}`, max, windowSeconds)
 }
@@ -103,7 +111,7 @@ export async function spendBudget(
   bucket: string,
   max: number,
   windowSeconds: number,
-): Promise<boolean> {
+): Promise<RateLimitVerdict> {
   try {
     return await withAnon(async (tx) => {
       const result = await tx.execute(
@@ -112,17 +120,31 @@ export async function spendBudget(
       )
 
       const rows = result as unknown as Array<{ allowed: boolean }>
-      return rows[0]?.allowed === true
+      return rows[0]?.allowed === true ? 'allowed' : 'limited'
     })
   } catch (error) {
-    // Without this line a database outage is indistinguishable from ordinary
-    // traffic hitting its limit — every user is refused, and the logs say
-    // nothing but "too many attempts". The bucket is safe to record; it is an
-    // address and a scope, not content.
+    // The bucket is safe to record; it is an address and a scope, not content.
     logError('ratelimit.unavailable', error, { bucket })
-    return false
+    return 'unavailable'
   }
 }
 
 /** The message shown when a budget is spent. Shared so it reads the same everywhere. */
 export const RATE_LIMITED_MESSAGE = 'Too many attempts. Wait a minute and try again.'
+
+/**
+ * The message shown when the limiter could not run at all.
+ *
+ * Deliberately says nothing about which dependency failed — that belongs in the
+ * log, not in a response to an anonymous caller — but it does say that waiting
+ * is not the answer, which is the one thing the person needs to know.
+ */
+export const SERVICE_UNAVAILABLE_MESSAGE =
+  'Something is wrong on our side. This is not your account — try again shortly.'
+
+/** Turns a refusal into the message that belongs with it. */
+export function refusalMessage(
+  verdict: Exclude<RateLimitVerdict, 'allowed'>,
+): string {
+  return verdict === 'limited' ? RATE_LIMITED_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE
+}
