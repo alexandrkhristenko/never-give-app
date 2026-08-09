@@ -20,15 +20,31 @@ import * as schema from './schema';
  */
 let handle: ReturnType<typeof connect> | null = null;
 
-function connect() {
-  const connectionString = process.env.DATABASE_URL;
+/**
+ * `POSTGRES_URL` is not an alias anyone invented here: it is the name Vercel's
+ * Supabase integration writes the pooled connection string under. A project set
+ * up that way already has the value and still reports the variable as missing,
+ * which is a confusing way to be broken over a difference in spelling.
+ *
+ * Order matters. `DATABASE_URL` wins, so an explicitly set variable is never
+ * quietly overruled by one the platform put there. Deliberately absent:
+ * `POSTGRES_URL_NON_POOLING`, which the same integration sets to the direct
+ * connection — unreachable from Vercel over IPv4, and wrong for serverless even
+ * where it resolves.
+ */
+const SOURCES = ['DATABASE_URL', 'POSTGRES_URL'] as const;
 
-  if (!connectionString) {
+function connect() {
+  const name = SOURCES.find((key) => process.env[key]);
+
+  if (!name) {
     throw new Error(
-      'DATABASE_URL is not set. Every page and every action needs it; ' +
-        'see docs/architecture.md §9.',
+      `Neither ${SOURCES.join(' nor ')} is set. Every page and every action ` +
+        'needs one of them; see docs/architecture.md §9.',
     );
   }
+
+  const connectionString = process.env[name]!;
 
   // Disable prefetch as it is not supported for "Transaction" pool mode (often
   // used with Supabase/Neon connection poolers)
