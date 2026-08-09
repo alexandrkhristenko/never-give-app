@@ -19,10 +19,13 @@ export default function PromiseForm({
   defaultTitle,
   defaultVisibility,
   username,
+  host,
 }: {
   defaultTitle: string
   defaultVisibility: string
   username: string
+  /** Where this deployment actually answers. Passed in: see `siteHost`. */
+  host: string
 }) {
   const [state, action, pending] = useActionState(savePromise, INITIAL_STATE)
   const [title, setTitle] = useState(defaultTitle)
@@ -88,8 +91,8 @@ export default function PromiseForm({
 
       <p className="font-mono text-xs text-ink-muted [overflow-wrap:anywhere]">
         {visibility === 'private'
-          ? 'While private, never-give.app/' + username + ' shows nothing.'
-          : 'never-give.app/' + username}
+          ? `While private, ${host}/${username} shows nothing.`
+          : `${host}/${username}`}
       </p>
 
       <PixelButton type="submit" variant="primary" full aria-busy={pending}>

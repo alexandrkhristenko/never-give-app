@@ -6,6 +6,7 @@ import Panel from '@/components/ui/panel'
 import { requireSessionUser } from '@/lib/dal/session'
 import { getProfile } from '@/lib/dal/user'
 import { getOwnPromiseView } from '@/lib/dal/promise'
+import { siteHost } from '@/lib/site-url'
 import { readThemeCookie } from '@/lib/theme'
 import { logError } from '@/lib/log'
 import DeleteAccount from './delete-account'
@@ -64,6 +65,7 @@ export default async function SettingsPage() {
           defaultTitle={promise.title}
           defaultVisibility={promise.visibility}
           username={profile.username}
+          host={siteHost()}
         />
       </Panel>
 

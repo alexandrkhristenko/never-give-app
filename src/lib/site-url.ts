@@ -51,6 +51,23 @@ function normalize(value: string): string {
   return withScheme.replace(/\/+$/, '')
 }
 
+/**
+ * The same address without its scheme, for showing a person where their page
+ * will live: `never-give-app.vercel.app/player`.
+ *
+ * It exists because two forms hard-coded the string `never-give.app/` and
+ * promised a URL on a domain the deployment does not answer on — and, in local
+ * development, one that is not even reachable. A hint that cannot be followed is
+ * worse than no hint.
+ *
+ * Both callers are client components, so they cannot call this themselves:
+ * `VERCEL_PROJECT_PRODUCTION_URL` has no `NEXT_PUBLIC_` prefix and is therefore
+ * absent from the browser bundle by design. The value is passed down as a prop.
+ */
+export function siteHost(): string {
+  return siteUrl().url.replace(/^https?:\/\//, '')
+}
+
 export function siteUrl(): SiteUrl {
   // Named literally, not looked up: Next substitutes `process.env.NEXT_PUBLIC_*`
   // at build time only where it appears as a literal.
