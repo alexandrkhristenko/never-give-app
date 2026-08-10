@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
+import { announceTestDatabase, testDatabaseUrl } from './connection'
 import { checkIn, getOwnPromiseView } from '@/lib/dal/promise'
 import type { Profile } from '@/lib/dal/user'
 import { addDays } from '@/lib/dates'
@@ -20,7 +21,8 @@ import { MAX_FREEZE_BALANCE } from '@/lib/streak'
  * they run.
  */
 
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1 })
+announceTestDatabase()
+const sql = postgres(testDatabaseUrl(), { prepare: false, max: 1 })
 
 const NOW = new Date('2026-08-10T12:00:00Z')
 const TODAY = '2026-08-10'

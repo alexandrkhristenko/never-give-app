@@ -42,6 +42,19 @@
   cursor: pointer;
   box-shadow: var(--shadow-pixel-sm);
   transition: translate 80ms steps(2, end), box-shadow 80ms steps(2, end);
+  /*
+   * The same baked border image the inputs carried, and the same consequence
+   * hidden better. The coloured variants got away with it — their border is
+   * `currentColor`, which for `is-primary`, `is-success` and `is-error` is the
+   * dark panel ink, so the fill happened to be the right answer. This one did
+   * not: its ink is light, its background *is* the panel behind it, and the
+   * border meant to separate the two painted itself black on black. What was
+   * left of the button was its text and its drop shadow.
+   *
+   * Dropping the image leaves every variant outlined in its own ink, which is
+   * why a blue primary button does not grow a pale border in the dark theme.
+   */
+  border-image-source: none;
 }
 
 /*
@@ -91,11 +104,30 @@
   background-color: var(--color-edge);
 }
 
+/*
+ * NES.css draws these borders with `border-image-source` — an inline SVG whose
+ * fill is baked in as `rgb(33,37,41)`. A border image replaces the border
+ * colour outright, so the `border-color` below had never once had an effect:
+ * in the light theme the baked near-black happens to be right, and in the dark
+ * theme it was black on black. An empty field was a rectangle of very slightly
+ * lighter background and nothing else — no boundary at all, which is WCAG
+ * 1.4.11 as much as it is a thing nobody can find.
+ *
+ * Dropping the image rather than replacing it per theme: a data URI cannot read
+ * a custom property, so the alternative is two hard-coded fills that drift from
+ * `--color-edge` the first time a theme is retuned. Without the image these
+ * controls take their border the same way `.nes-container` already does, from
+ * the same variable, which is also why they now match the panel they sit on.
+ *
+ * The cost is the notched corner the image drew. Four pixels of square edge is
+ * what a panel has, so the loss is consistency rather than character.
+ */
 .nes-input,
 .nes-textarea,
 .nes-select select {
   color: var(--color-ink);
   background-color: var(--color-panel);
+  border-image-source: none;
   border-color: var(--color-edge);
 }
 

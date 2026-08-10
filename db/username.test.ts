@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
+import { announceTestDatabase, testDatabaseUrl } from './connection'
 import { isUsernameTaken } from '@/lib/dal/username'
 
 /**
@@ -14,7 +15,8 @@ import { isUsernameTaken } from '@/lib/dal/username'
  * that narrows the grant fails here rather than in production.
  */
 
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1 })
+announceTestDatabase()
+const sql = postgres(testDatabaseUrl(), { prepare: false, max: 1 })
 const OCCUPANT = '00000000-0000-0000-0000-00000000ca7e'
 
 async function claim(username: string) {

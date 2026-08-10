@@ -16,7 +16,7 @@
 | [docs/debt.md](docs/debt.md) | Реестр долга: что закрыто, что заблокировано, что решено не чинить |
 | [docs/handover.md](docs/handover.md) | Что осталось сделать руками |
 | [docs/known-issues.md](docs/known-issues.md) | История дефектов MVP и осознанный техдолг |
-| [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации |
+| [docs/superpowers/plans/](docs/superpowers/plans/) | Планы реализации. Актуальный — [дальнейшие шаги](docs/superpowers/plans/2026-08-10-next-steps.md) |
 | [docs/pr-description-auth-and-docs.md](docs/pr-description-auth-and-docs.md) | Описание текущего PR |
 
 ## Стек
@@ -123,11 +123,15 @@ npm run dev
 `.env.local`: всё, что читает серверный рантайм приложения, не должно уметь
 обходить RLS. Обоснование и цена этого решения — [docs/debt.md](docs/debt.md) B1.
 
-Оба набора пишут в ту же базу, на которую указывает `DATABASE_URL`. Если это
-продовая база — а сейчас это она, — то прогон тестов есть операция над
-продовыми данными. Удаления в наборах привязаны к своему `id` или к домену
-`@never-give.test`; `npm run db:prune-test-users` сметает то, что осталось от
-прерванного прогона (по умолчанию только показывает, удаляет с `--delete`).
+Оба набора пишут в базу из `TEST_DATABASE_URL`, а если её нет — из
+`DATABASE_URL`. Второе означает продовую базу, и набор говорит об этом строкой
+`[tests] writing to …` в начале прогона. Переключение на отдельную базу — одна
+переменная в `.env.local`, а не правка шести файлов: решение принимает
+`db/connection.ts`.
+
+Удаления в наборах привязаны к своему `id` или к домену `@never-give.test`;
+`npm run db:prune-test-users` сметает то, что осталось от прерванного прогона
+(по умолчанию только показывает, удаляет с `--delete`).
 
 ## Деплой
 

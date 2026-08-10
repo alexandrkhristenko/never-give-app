@@ -51,3 +51,39 @@ test('the landing does not print what the URL asked it to', async ({ page }) => 
   )
   await expect(alert).not.toContainText('555-0100')
 })
+
+/*
+ * These used to answer 200 with the loading skeleton — the panel title and
+ * nothing else — because in Next 16 a dynamic route streams its status before
+ * the server component can decide to redirect. No data leaked: the DAL
+ * redirects before it reads anything. What leaked was honesty, and a rendered
+ * page nobody was ever going to see.
+ */
+for (const path of ['/dashboard', '/settings', '/onboarding']) {
+  test(`${path} sends a signed-out visitor away instead of answering 200`, async ({
+    page,
+  }) => {
+    await page.context().clearCookies()
+
+    const response = await page.request.get(path, { maxRedirects: 0 })
+
+    expect(response.status(), `${path} status`).toBe(307)
+    const location = new URL(
+      response.headers()['location'],
+      'http://localhost:3000',
+    )
+    expect(location.pathname, `${path} destination`).toBe('/login')
+  })
+}
+
+// The username lives in the root segment, so a prefix match without a boundary
+// would swallow profiles: `/dashboardguy` is a name somebody could register.
+test('a profile whose name starts like a private route is untouched', async ({
+  page,
+}) => {
+  await page.context().clearCookies()
+
+  const response = await page.request.get('/dashboardguy', { maxRedirects: 0 })
+
+  expect(response.status()).toBe(200)
+})

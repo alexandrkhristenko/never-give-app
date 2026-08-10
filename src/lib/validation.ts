@@ -118,3 +118,27 @@ export function resolveTimezone(raw: string | null | undefined): {
   if (!isKnownTimezone(raw)) return { timezone: 'UTC', detected: false }
   return { timezone: raw, detected: true }
 }
+
+/**
+ * The first candidate any runtime can resolve, in the order given.
+ *
+ * Two sources, and the order matters. The form field is what this browser says
+ * right now; the cookie is what it said on an earlier page. The field wins when
+ * it has anything to say, because a person can move between zones and the
+ * cookie will be a year stale.
+ *
+ * The cookie is written by client script, so it is forgeable by whoever owns the
+ * browser — which is why it goes through `resolveTimezone` like everything else,
+ * and why an unresolvable value falls through instead of shadowing the next
+ * candidate. The worst a forged one achieves is a wrong day boundary in its own
+ * account.
+ */
+export function pickTimezone(
+  candidates: readonly (string | null | undefined)[],
+): { timezone: string; detected: boolean } {
+  for (const candidate of candidates) {
+    const resolved = resolveTimezone(candidate)
+    if (resolved.detected) return resolved
+  }
+  return { timezone: 'UTC', detected: false }
+}

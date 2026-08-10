@@ -1,5 +1,11 @@
 import { test as base } from '@playwright/test'
 import postgres from 'postgres'
+import {
+  announceTestDatabase,
+  hasTestDatabase,
+  missingTestDatabaseReason,
+  testDatabaseUrl,
+} from '../db/connection'
 
 /**
  * A throwaway account for one test, created in the database rather than through
@@ -24,12 +30,8 @@ import postgres from 'postgres'
  * file goes back to `auth.admin.createUser`.
  */
 
-const CONNECTION = process.env.DATABASE_URL
-
-export const hasDatabaseAccess = Boolean(CONNECTION)
-
-export const missingDatabaseReason =
-  'DATABASE_URL is not set. It belongs in .env.local, next to the Supabase keys.'
+export const hasDatabaseAccess = hasTestDatabase
+export const missingDatabaseReason = missingTestDatabaseReason
 
 /**
  * Built on demand, not at import time. A module-level client would throw before
@@ -39,8 +41,9 @@ export const missingDatabaseReason =
 let client: ReturnType<typeof postgres> | null = null
 
 function sql() {
-  if (!CONNECTION) throw new Error(missingDatabaseReason)
-  client ??= postgres(CONNECTION, { prepare: false, max: 1 })
+  if (!hasTestDatabase) throw new Error(missingTestDatabaseReason)
+  announceTestDatabase()
+  client ??= postgres(testDatabaseUrl(), { prepare: false, max: 1 })
   return client
 }
 

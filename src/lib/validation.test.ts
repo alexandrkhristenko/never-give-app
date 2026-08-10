@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   PROMISE_MAX_LENGTH,
+  pickTimezone,
   resolveTimezone,
   validatePromiseTitle,
   validateUsername,
@@ -136,6 +137,50 @@ describe('resolveTimezone', () => {
     expect(resolveTimezone('Not/AZone')).toEqual({
       timezone: 'UTC',
       detected: false,
+    })
+  })
+})
+
+describe('pickTimezone', () => {
+  it('prefers what the form submitted', () => {
+    expect(pickTimezone(['America/New_York', 'Europe/Berlin'])).toEqual({
+      timezone: 'America/New_York',
+      detected: true,
+    })
+  })
+
+  // The case the cookie exists for: the form beat hydration and sent nothing.
+  it('falls back to the remembered zone', () => {
+    expect(pickTimezone([undefined, 'Europe/Berlin'])).toEqual({
+      timezone: 'Europe/Berlin',
+      detected: true,
+    })
+    expect(pickTimezone(['', 'Europe/Berlin'])).toEqual({
+      timezone: 'Europe/Berlin',
+      detected: true,
+    })
+  })
+
+  // A cookie is client-writable, so an unresolvable one must not shadow a
+  // later candidate — and must not be stored.
+  it('skips a candidate no runtime can resolve', () => {
+    expect(pickTimezone(['Not/AZone', 'Europe/Berlin'])).toEqual({
+      timezone: 'Europe/Berlin',
+      detected: true,
+    })
+  })
+
+  it('reports undetected when nothing usable arrived', () => {
+    expect(pickTimezone([undefined, null, ''])).toEqual({
+      timezone: 'UTC',
+      detected: false,
+    })
+  })
+
+  it('treats a reported UTC as a real answer and stops there', () => {
+    expect(pickTimezone(['UTC', 'Europe/Berlin'])).toEqual({
+      timezone: 'UTC',
+      detected: true,
     })
   })
 })

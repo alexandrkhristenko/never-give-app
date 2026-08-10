@@ -127,3 +127,115 @@ test('interactive elements take focus and show it', async ({ page }) => {
   )
   expect(parseFloat(outlineWidth)).toBeGreaterThan(0)
 })
+
+/*
+ * A form control has to have a visible boundary — WCAG 1.4.11, non-text
+ * contrast — and in the dark theme these had none at all: an empty field was a
+ * rectangle of very slightly lighter background and nothing else.
+ *
+ * The cause is worth encoding rather than describing. NES.css draws the border
+ * of `.nes-input`, `.nes-textarea` and `.nes-select select` with
+ * `border-image-source`: an inline SVG whose fill is baked in as
+ * `rgb(33,37,41)`. A border image replaces the border colour outright, so
+ * `nes-theme.css` setting `border-color: var(--color-edge)` had never once had
+ * an effect. In the light theme the baked near-black happens to be right; in
+ * the dark theme it is black on black.
+ *
+ * Asserting the computed colour alone cannot catch this — it reports the value
+ * we set while the image paints something else. So the assertion is on the
+ * image: any control that carries one is lying about its border.
+ */
+test('form controls have a border that follows the theme', async ({ page }) => {
+  for (const theme of ['dark', 'light'] as const) {
+    await page.context().clearCookies()
+    await page.context().addCookies([
+      { name: 'theme', value: theme, url: 'http://localhost:3000' },
+    ])
+    await page.goto('/login')
+    await settled(page)
+
+    // Resolved through a throwaway element rather than read off the custom
+    // property: the variable holds a hex string and `borderTopColor` is always
+    // reported as `rgb(...)`, so comparing the two directly compares notations.
+    const edge = await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.borderColor = 'var(--color-edge)'
+      document.body.append(probe)
+      const resolved = getComputedStyle(probe).borderTopColor
+      probe.remove()
+      return resolved
+    })
+
+    const controls = page.locator('input:not([type="hidden"]), select, textarea')
+    const count = await controls.count()
+    expect(count, `${theme}: controls on /login`).toBeGreaterThan(0)
+
+    for (let i = 0; i < count; i++) {
+      const seen = await controls.nth(i).evaluate((el) => {
+        const style = getComputedStyle(el)
+        return {
+          id: el.id,
+          image: style.borderImageSource,
+          color: style.borderTopColor,
+          width: parseFloat(style.borderTopWidth),
+        }
+      })
+
+      expect(seen.image, `${theme}: ${seen.id} border image`).toBe('none')
+      expect(seen.width, `${theme}: ${seen.id} border width`).toBeGreaterThan(0)
+      expect(seen.color, `${theme}: ${seen.id} border colour`).toBe(edge)
+    }
+  }
+})
+
+/*
+ * The same lie, one component over. `.nes-btn` carries the same baked
+ * `border-image-source`, and the audit that found it looked at every element on
+ * every page rather than at the one that was reported — which is how the button
+ * turned up at all.
+ *
+ * The coloured variants got away with it: their border colour is `currentColor`,
+ * which for `is-primary`, `is-success` and `is-error` is the dark panel ink, so
+ * the baked near-black happened to be the right answer. The default variant did
+ * not: its ink is light, its background *is* the panel behind it, and the border
+ * that was supposed to separate the two painted itself black on black. A button
+ * readable only by its text and its drop shadow.
+ *
+ * Anchors are included deliberately — three of the sign-in controls are links
+ * wearing `.nes-btn`, and a selector that only looked at `button` would have
+ * reported the page clean.
+ */
+test('buttons have a border that follows the theme', async ({ page }) => {
+  for (const theme of ['dark', 'light'] as const) {
+    await page.context().clearCookies()
+    await page.context().addCookies([
+      { name: 'theme', value: theme, url: 'http://localhost:3000' },
+    ])
+    await page.goto('/')
+    await settled(page)
+
+    const buttons = page.locator('.nes-btn')
+    const count = await buttons.count()
+    expect(count, `${theme}: buttons on the landing page`).toBeGreaterThan(0)
+
+    for (let i = 0; i < count; i++) {
+      const seen = await buttons.nth(i).evaluate((el) => {
+        const style = getComputedStyle(el)
+        return {
+          what: `${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[1] ?? 'default'}`,
+          image: style.borderImageSource,
+          width: parseFloat(style.borderTopWidth),
+          // `currentColor` by design: each variant's outline matches its own
+          // text, which is what keeps a blue primary button from growing a pale
+          // border in the dark theme.
+          color: style.borderTopColor,
+          ink: style.color,
+        }
+      })
+
+      expect(seen.image, `${theme}: ${seen.what} border image`).toBe('none')
+      expect(seen.width, `${theme}: ${seen.what} border width`).toBeGreaterThan(0)
+      expect(seen.color, `${theme}: ${seen.what} border colour`).toBe(seen.ink)
+    }
+  }
+})

@@ -8,7 +8,7 @@
 | UI | React 19.2, Server Components по умолчанию | |
 | Стили | Tailwind CSS 4 + [NES.css](https://nostalgic-css.github.io/NES.css/) | 8-битная эстетика |
 | Шрифт | `Press_Start_2P` через `next/font/google` | Подмножество `latin` |
-| Аутентификация | Supabase Auth (`@supabase/ssr`) | Google, GitHub, email+пароль |
+| Аутентификация | Supabase Auth (`@supabase/ssr`) | Почта с паролем работает. Google и GitHub реализованы, но **не включены** в проекте Supabase — см. §4 |
 | БД | PostgreSQL (Supabase) | |
 | Доступ к БД | Drizzle ORM + `postgres-js` | `prepare: false` — pooler в transaction mode |
 | Миграции | `drizzle-kit` | Каталог `drizzle/` |
@@ -21,7 +21,8 @@
 
 ```
 /                        Лендинг. Авторизованных редиректит на /dashboard
-/login                   Форма email + пароль (Client Component)
+/login                   Вход и регистрация по почте. Страница серверная,
+                         форма внутри — клиентская (login-form.tsx)
 /onboarding              Первичная настройка: username, обещание, видимость
 /dashboard               Личный кабинет: стрик, кнопка чек-ина
 /settings                Обещание, видимость, таймзона, удаление аккаунта
@@ -45,7 +46,8 @@ src/
     layout.tsx              Корневой layout, подключение шрифта
     globals.css             Tailwind + NES.css
     page.tsx                Лендинг
-    login/                  page.tsx (client) + actions.ts
+    login/                  page.tsx (server) + login-form.tsx (client) +
+                            actions.ts
     onboarding/             page.tsx + actions.ts + onboarding-form.tsx (client)
     dashboard/              page.tsx + actions.ts + error.tsx + loading.tsx
     settings/               page.tsx + actions.ts + promise-form.tsx +
@@ -64,7 +66,7 @@ src/
   lib/
     dates.ts                Чистые операции с локальными датами
     streak.ts               Чистая логика стриков и заморозок
-    validation.ts           Валидация username и длины обещания
+    validation.ts           Валидация username, длины обещания и таймзоны
     log.ts                  Структурный логгер, по строке JSON на событие
     rate-limit.ts           Обёртка над private.rate_limit_hit
     site-url.ts             Собственный адрес приложения и его источник
@@ -96,6 +98,13 @@ src/
 
 ### OAuth (Google, GitHub)
 
+**Провайдеры не включены в проекте Supabase**, поэтому поток ниже доходит до
+`authorize` и обрывается там: Supabase отвечает
+`400 {"msg":"Unsupported provider: provider is not enabled"}`, и человек видит
+страницу с JSON вне приложения. Кодом это не чинится — `signInWithOAuth`
+возвращает исправный URL, отказывает уже эндпоинт Supabase. Нужны client id и
+secret в Authentication → Providers, см. [debt.md](./debt.md) B10.
+
 ```
 Лендинг: <form action="/auth/signin" method="post"> с hidden provider
   → POST /auth/signin
@@ -123,6 +132,21 @@ src/
 Это обновляет истёкший access token и переписывает cookies. Proxy **не**
 принимает решений об авторизации: согласно рекомендациям Next.js, он делает
 максимум оптимистичные проверки, а настоящая защита живёт в DAL, ближе к данным.
+
+Одна такая оптимистичная проверка там есть: если пользователя нет, а путь
+начинается с `/dashboard`, `/settings` или `/onboarding`, proxy отвечает
+редиректом на `/login`. Решение о доступе к строкам это не переносит — им
+по-прежнему заняты DAL и RLS. Смысл в честности ответа: до этого такой запрос
+получал **200 и скелет** из `loading.tsx`, потому что в Next 16 статус
+динамического маршрута уходит раньше, чем серверный компонент успевает
+передумать.
+
+Вызов `getUser()` здесь стоял и раньше, а его результат выбрасывался, поэтому
+проверка не добавила ни одного обращения к Supabase.
+
+Границы префиксов заданы явно, а не через `startsWith`: username живёт в
+корневом сегменте, поэтому `/dashboardguy` — это профиль, который кто-то мог
+зарегистрировать. На это есть отдельный тест.
 
 ### Проверка личности
 

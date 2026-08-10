@@ -1,5 +1,6 @@
 'use server'
 
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { requireSessionUser } from '@/lib/dal/session'
 import {
@@ -8,7 +9,7 @@ import {
 } from '@/lib/dal/promise'
 import {
   PROMISE_MAX_LENGTH,
-  resolveTimezone,
+  pickTimezone,
   validateUsername,
 } from '@/lib/validation'
 import { refusalMessage, withinRateLimit } from '@/lib/rate-limit'
@@ -106,13 +107,14 @@ export async function completeOnboarding(
     return { error: refusalMessage(budget), field: 'username' }
   }
 
-  // `UTC` is both a real answer and the absence of one. The hidden field is
-  // filled by an effect, so a submit that beats hydration sends nothing — and
-  // the account is created on a day boundary the person never chose. Storing
-  // UTC anyway is still the right trade (see `resolveTimezone`); being unable
-  // to count how often it happens was not.
-  const zone = resolveTimezone(formData.get('timezone')?.toString())
+  // Two chances at the zone. The field is what the browser says now; the cookie
+  // is what it said on an earlier page, and it is there precisely for a submit
+  // that beat hydration. See `pickTimezone` and docs/debt.md D4.
+  const remembered = (await cookies()).get('tz')?.value
+  const zone = pickTimezone([formData.get('timezone')?.toString(), remembered])
   if (!zone.detected) {
+    // Now means both sources failed: no script ran at all, or a forged cookie.
+    // Still not a reason to refuse a signup — settings can correct it.
     logWarn('onboarding.timezone_absent', { userId: session.id })
   }
 
