@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
+import { announceTestDatabase, testDatabaseUrl } from './connection'
 import { spendBudget } from '@/lib/rate-limit'
 
 /**
@@ -12,7 +13,8 @@ import { spendBudget } from '@/lib/rate-limit'
  * application code, which sees only a verdict.
  */
 
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 5 })
+announceTestDatabase()
+const sql = postgres(testDatabaseUrl(), { prepare: false, max: 5 })
 
 const bucket = (name: string) => `test:${name}`
 

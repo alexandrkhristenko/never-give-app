@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
+import { announceTestDatabase, testDatabaseUrl } from './connection'
 import { createProfileAndPromise } from '@/lib/dal/promise'
 import { PROMISE_MAX_LENGTH } from '@/lib/validation'
 
@@ -17,7 +18,8 @@ import { PROMISE_MAX_LENGTH } from '@/lib/validation'
  * занятом username" as a done criterion; this is where it is checked.
  */
 
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1 })
+announceTestDatabase()
+const sql = postgres(testDatabaseUrl(), { prepare: false, max: 1 })
 
 /** A second identity, so a name can genuinely be taken by somebody else. */
 const SQUATTER = '00000000-0000-0000-0000-00000000beef'

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import postgres from 'postgres'
+import { announceTestDatabase, testDatabaseUrl } from './connection'
 import {
   deleteAccount,
   updatePromise,
@@ -20,7 +21,8 @@ import {
  * They create a disposable identity and delete that — see `disposable()`.
  */
 
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1 })
+announceTestDatabase()
+const sql = postgres(testDatabaseUrl(), { prepare: false, max: 1 })
 
 /** A second identity, so "somebody else's row" is a real row. */
 const STRANGER = '00000000-0000-0000-0000-0000000dbeef'
