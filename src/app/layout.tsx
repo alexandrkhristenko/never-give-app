@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Press_Start_2P } from 'next/font/google'
+import RememberTimezone from '@/components/system/remember-timezone'
 import { siteUrl } from '@/lib/site-url'
 import { readThemeCookie } from '@/lib/theme'
 import './globals.css'
@@ -39,7 +40,13 @@ export default async function RootLayout({
       data-theme={theme}
       className={`${pressStart2P.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-bg text-ink">{children}</body>
+      <body className="flex min-h-full flex-col bg-bg text-ink">
+        {/* Renders nothing. Here rather than in the onboarding form so that it
+            runs on an earlier page than the one that submits — see the
+            component. */}
+        <RememberTimezone />
+        {children}
+      </body>
     </html>
   )
 }
