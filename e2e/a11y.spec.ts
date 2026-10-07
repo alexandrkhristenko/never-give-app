@@ -239,3 +239,49 @@ test('buttons have a border that follows the theme', async ({ page }) => {
     }
   }
 })
+
+/*
+ * The rule, rather than the two components that broke it.
+ *
+ * `.nes-input` and `.nes-btn` are covered by name above, and that was enough
+ * only because the list of NES.css components in use happened to be short.
+ * `.nes-progress`, `.nes-balloon`, `.nes-dialog` and `.nes-table.is-bordered`
+ * carry the same baked `border-image-source`, and each will arrive the day
+ * somebody needs it. D5 survived for as long as the dark theme existed because
+ * the search was aimed at a component instead of at the rule.
+ *
+ * The rule: in this interface a border is not painted by an image. A border
+ * image cannot read a custom property, so anything carrying one is showing a
+ * colour that no theme chose — which is exactly how a field ended up black on
+ * black while its computed `border-color` reported the right answer.
+ */
+test('no element paints its border with an image', async ({ page }) => {
+  for (const theme of ['dark', 'light'] as const) {
+    await page.context().clearCookies()
+    await page.context().addCookies([
+      { name: 'theme', value: theme, url: 'http://localhost:3000' },
+    ])
+
+    for (const path of ['/', '/login', '/nobody-has-this-name']) {
+      await page.goto(path)
+      await settled(page)
+
+      const offenders = await page.evaluate(() =>
+        [...document.querySelectorAll('*')]
+          .filter((el) => {
+            const style = getComputedStyle(el)
+            return (
+              style.borderImageSource !== 'none' &&
+              parseFloat(style.borderTopWidth) > 0
+            )
+          })
+          .map(
+            (el) =>
+              `${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]}`,
+          ),
+      )
+
+      expect(offenders, `${theme} ${path}`).toEqual([])
+    }
+  }
+})
